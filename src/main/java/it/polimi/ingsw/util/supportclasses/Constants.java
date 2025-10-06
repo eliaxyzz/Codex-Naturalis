@@ -2,11 +2,8 @@ package it.polimi.ingsw.util.supportclasses;
 
 public final class Constants {
     public static int MAX_HAND_SIZE = 3;
- //CLI Constants
-    public static String MENU_HEADER =
-            ConsoleColor.RED+"╔╦╗"+ ConsoleColor.GREEN+"╔═╗"+ ConsoleColor.PURPLE+"╔╗╔"+ConsoleColor.YELLOW+"╦ ╦\n" +
-                    ConsoleColor.RED+"║║║"+ ConsoleColor.GREEN+"║╣ "+ ConsoleColor.PURPLE+"║║║"+ConsoleColor.YELLOW+"║ ║\n" +
-                    ConsoleColor.RED+"╩ ╩"+ ConsoleColor.GREEN+"╚═╝"+ ConsoleColor.PURPLE+"╝╚╝"+ConsoleColor.YELLOW+"╚═╝\n"+ConsoleColor.RESET;
-    public static final String INVALID_ARGUMENT_COUNT_MESSAGE = "Invalid number of arguments";
-    public static final String INVALID_ARGUMENT_TYPE_MESSAGE = "Invalid argument type";
+    public static int SCORE_GOAL = 20;
+
+    public static final int PING_INTERVAL = 2000; //defines the time between ping messages in milliseconds
+    public static final int PING_TRIES = 3; //defines the number of ping that have no response before determining the connection is lost
 }

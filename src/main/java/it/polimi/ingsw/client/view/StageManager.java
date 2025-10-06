@@ -1,7 +1,6 @@
 package it.polimi.ingsw.client.view;
 
 import it.polimi.ingsw.client.view.CLI.CLIViewController;
-import it.polimi.ingsw.client.view.GUI.viewControllers.ViewController;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
@@ -9,21 +8,16 @@ import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
-
-import java.awt.*;
 import java.io.IOException;
-
 import static it.polimi.ingsw.util.supportclasses.ViewConstants.*;
 
 /**
  * The StageManager class manages the current stage and view controller of the application.
- * It provides methods to load different scenes with specified backgrounds.
+ * It provides methods to load different scenes with different settings.
  */
 public class StageManager {
-
     private static Stage currentStage;
     private static ViewController currentViewController;
-
 
     public static void setCurrentStage(Stage currentStage) {
         StageManager.currentStage = currentStage;
@@ -33,7 +27,6 @@ public class StageManager {
         return currentStage;
     }
 
-
     public static ViewController getCurrentViewController() {
         return currentViewController;
     }
@@ -41,17 +34,16 @@ public class StageManager {
     /**
      * Sets a new instance of CLIViewController as currentViewController.
      */
-
     public static void enableCLIMode() {
         currentViewController = new CLIViewController();
     }
 
     /**
      * Loads an ImageView with the specified background image.
-     *
-     * @param path the path to the background image
-     * @return an ImageView containing the background image
+     * @param path The path to the background image.
+     * @return The ImageView containing the background image.
      */
+    @SuppressWarnings("all")
     private static ImageView loadBackground(String path) {
         Image backgroundImage = new Image(StageManager.class.getResourceAsStream(path));
         ImageView backgroundImageView = new ImageView(backgroundImage);
@@ -60,12 +52,12 @@ public class StageManager {
     }
 
     /**
-     * Creates a StackPane with a background image and loads the specified FXML.
-     *
-     * @param fxmlPath the path to the FXML file to be loaded
-     * @return a StackPane containing the background image and loaded FXML content
+     * Creates a StackPane with an optional background image and loads the specified FXML.
+     * @param fxmlPath The path to the FXML file to be loaded.
+     * @param withBackground True if the background has to be loaded, False otherwise.
+     * @return The StackPane containing the background image and loaded FXML content.
      */
-    private static StackPane createStackPaneWithBackground(String fxmlPath) {
+    private static StackPane createStackPane(String fxmlPath, boolean withBackground) {
         FXMLLoader loader = new FXMLLoader(StageManager.class.getResource(fxmlPath));
         Parent root;
         try {
@@ -75,65 +67,52 @@ public class StageManager {
         }
         currentViewController = loader.getController();
         StackPane stackPane = new StackPane();
-        ImageView backgroundImageView = loadBackground("/Images/Backgrounds/wood_background.jpg");
-        stackPane.getChildren().add(backgroundImageView);
+        if (withBackground) {
+            ImageView backgroundImageView = loadBackground("/Images/Backgrounds/wood_background.jpg");
+            stackPane.getChildren().add(backgroundImageView);
+            backgroundImageView.fitWidthProperty().bind(stackPane.widthProperty());
+            backgroundImageView.fitHeightProperty().bind(stackPane.heightProperty());
+        }
         stackPane.getChildren().add(root);
-        backgroundImageView.fitWidthProperty().bind(stackPane.widthProperty());
-        backgroundImageView.fitHeightProperty().bind(stackPane.heightProperty());
 
         return stackPane;
     }
 
+    /**
+     * Loads the main title scene.
+     */
     public static void loadTitleScreenScene() {
-        StackPane stackPane = createStackPaneWithBackground("TitleScreenView.fxml");
+        StackPane stackPane = createStackPane("TitleScreenView.fxml", false);
         currentStage.setWidth(SCENE_WIDTH);
         currentStage.setHeight(SCENE_HEIGHT);
         showScene(new Scene(stackPane));
     }
 
+    /**
+     * Loads the scene for connecting to the server.
+     */
     public static void loadConnectToServerScene() {
-        StackPane stackPane = createStackPaneWithBackground("ConnectToServerView.fxml");
+        StackPane stackPane = createStackPane("ConnectToServerView.fxml", false);
         currentStage.setWidth(SCENE_WIDTH);
         currentStage.setHeight(SCENE_HEIGHT);
         showScene(new Scene(stackPane));
     }
-
 
     /**
      * Loads the GameBoard scene.
      */
     public static void loadGameBoardScene() {
-        StackPane stackPane = createStackPaneWithBackground("GameBoardView.fxml");
+        StackPane stackPane = createStackPane("GameBoardView.fxml", true);
         stackPane.prefWidthProperty().bind(currentStage.widthProperty());
         stackPane.prefHeightProperty().bind(currentStage.heightProperty());
-        //centerStage(currentStage);
         showScene(new Scene(stackPane));
-    }
-    private static void centerStage(Stage stage)
-    {
-        Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-        //GraphicsEnvironment graphicsEnvironment = GraphicsEnvironment.getLocalGraphicsEnvironment();
-        double anchorX, anchorY;
-//        double screenWidth=graphicsEnvironment.getDefaultScreenDevice().getDisplayMode().getWidth();
-//        double screenHeight=graphicsEnvironment.getDefaultScreenDevice().getDisplayMode().getHeight();
-        if(screenSize.getWidth()<=currentStage.getWidth() || screenSize.getHeight()<=currentStage.getHeight())
-        {
-            anchorX=0;
-            anchorY=0;
-        }
-        else {
-            anchorX = (screenSize.getWidth() - currentStage.getWidth()) / 2;
-            anchorY = (screenSize.getHeight() - currentStage.getHeight()) / 2;
-        }
-        stage.setX(anchorX);
-        stage.setY(anchorY);
     }
 
     /**
      * Loads the Welcome scene.
      */
     public static void loadWelcomeScene() {
-        StackPane stackPane = createStackPaneWithBackground("WelcomeView.fxml");
+        StackPane stackPane = createStackPane("WelcomeView.fxml", false);
         currentStage.setWidth(SCENE_WIDTH);
         currentStage.setHeight(SCENE_HEIGHT);
         showScene(new Scene(stackPane));
@@ -143,7 +122,7 @@ public class StageManager {
      * Loads the CreateGame scene.
      */
     public static void loadCreateGameScene() {
-        StackPane stackPane = createStackPaneWithBackground("CreateGameView.fxml");
+        StackPane stackPane = createStackPane("CreateGameView.fxml", false);
         showScene(new Scene(stackPane));
     }
 
@@ -151,7 +130,7 @@ public class StageManager {
      * Loads the JoinGame scene.
      */
     public static void loadJoinGameScene() {
-        StackPane stackPane = createStackPaneWithBackground("JoinGameView.fxml");
+        StackPane stackPane = createStackPane("JoinGameView.fxml", false);
         showScene(new Scene(stackPane));
     }
 
@@ -159,7 +138,7 @@ public class StageManager {
      * Loads the WaitForPlayers scene.
      */
     public static void loadWaitForPlayersScene() {
-        StackPane stackPane = createStackPaneWithBackground("WaitForPlayersView.fxml");
+        StackPane stackPane = createStackPane("WaitForPlayersView.fxml", false);
         showScene(new Scene(stackPane));
     }
 
@@ -167,7 +146,7 @@ public class StageManager {
      * Loads the ChooseCards scene.
      */
     public static void loadChooseCardsScene() {
-        StackPane stackPane = createStackPaneWithBackground("ChooseCardsView.fxml");
+        StackPane stackPane = createStackPane("ChooseCardsView.fxml", false);
         showScene(new Scene(stackPane));
     }
 
@@ -175,7 +154,7 @@ public class StageManager {
      * Loads the LostConnection scene.
      */
     public static void loadLostConnectionScene() {
-        StackPane stackPane = createStackPaneWithBackground("LostConnectionView.fxml");
+        StackPane stackPane = createStackPane("LostConnectionView.fxml", false);
         currentStage.setWidth(SCENE_WIDTH);
         currentStage.setHeight(SCENE_HEIGHT);
         showScene(new Scene(stackPane));
@@ -185,7 +164,7 @@ public class StageManager {
      * Loads the KickedFromGame scene.
      */
     public static void loadKickedFromGameScene() {
-        StackPane stackPane = createStackPaneWithBackground("KickedFromGameView.fxml");
+        StackPane stackPane = createStackPane("KickedFromGameView.fxml", false);
         currentStage.setWidth(SCENE_WIDTH);
         currentStage.setHeight(SCENE_HEIGHT);
         currentStage.centerOnScreen();
@@ -196,7 +175,7 @@ public class StageManager {
      * Loads the Leaderboard scene.
      */
     public static void loadLeaderboardScene() {
-        StackPane stackPane = createStackPaneWithBackground("LeaderboardView.fxml");
+        StackPane stackPane = createStackPane("LeaderboardView.fxml", false);
         currentStage.setWidth(SCENE_WIDTH);
         currentStage.setHeight(SCENE_HEIGHT);
         showScene(new Scene(stackPane));
@@ -204,7 +183,6 @@ public class StageManager {
 
     /**
      * Shows the specified scene on the current stage.
-     *
      * @param scene the scene to be shown
      */
     private static void showScene(Scene scene) {

@@ -4,21 +4,20 @@ import it.polimi.ingsw.client.controller.ClientController;
 import it.polimi.ingsw.client.model.ClientStateModel;
 import it.polimi.ingsw.client.model.PlayerModel;
 import it.polimi.ingsw.client.view.StageManager;
+import it.polimi.ingsw.client.view.ViewController;
+import it.polimi.ingsw.util.supportclasses.ClientState;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.Cursor;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
-import javafx.scene.layout.Pane;
-
+import java.util.Objects;
 
 /**
  * This class is the controller for the Main Menu Scene.
  */
-
 public class WelcomeViewController extends ViewController {
-
     @FXML
     private Button joinGameButton;
     @FXML
@@ -28,8 +27,6 @@ public class WelcomeViewController extends ViewController {
     @FXML
     private Button exitButton;
     @FXML
-    private Pane setUsernamePane;
-    @FXML
     private Label alertLabel;
     @FXML
     private Label errorLabel;
@@ -37,21 +34,18 @@ public class WelcomeViewController extends ViewController {
     private Button confirmUsernameButton;
     @FXML
     private TextField setUsernameTextField;
-;
 
     /**
      * Initializes the scene.
      */
     @FXML
     private void initialize() {
-
         errorLabel.setVisible(false);
         setUsernameTextField.setVisible(false);
         confirmUsernameButton.setVisible(false);
 
         Platform.runLater(this::updatePlayerInfo);
     }
-
 
     /**
      * Loads the "Join Game" scene.
@@ -67,7 +61,6 @@ public class WelcomeViewController extends ViewController {
     @FXML
     private void createGame(){
         StageManager.loadCreateGameScene();
-
     }
 
     /**
@@ -77,31 +70,28 @@ public class WelcomeViewController extends ViewController {
      */
     @FXML
     private void setUsername() {
-
-
         joinGameButton.setVisible(false);
         createGameButton.setVisible(false);
         exitButton.setVisible(false);
         setUsernameButton.setVisible(false);
 
-
         setUsernameTextField.setVisible(true);
         confirmUsernameButton.setVisible(true);
 
-
         confirmUsernameButton.setOnAction(event -> {
-            String username = setUsernameTextField.getText();
-            if(username.startsWith(" ") || username.endsWith(" ") || username.isEmpty()) {
+            String username = setUsernameTextField.getText().trim();
+            if(username.contains("\n") || username.isEmpty()) {
                 showErrorMessage("Invalid Username");
+                errorLabel.setVisible(true);
+            }
+            else if(username.length() > 15) {
+                showErrorMessage("The username is too long");
                 errorLabel.setVisible(true);
             }
             else {
                 ClientController.getInstance().sendSetUsernameMessage(username);
-
             }
         });
-
-
     }
 
     /**
@@ -109,9 +99,7 @@ public class WelcomeViewController extends ViewController {
      */
     @Override
     public void updatePlayerInfo(){
-
         Platform.runLater(()->{
-
             showMessage("User logged in as: " + PlayerModel.getInstance().getUsername());
             // Show other buttons
             joinGameButton.setVisible(true);
@@ -130,11 +118,7 @@ public class WelcomeViewController extends ViewController {
             setUsernameTextField.setVisible(false);
             confirmUsernameButton.setVisible(false);
             errorLabel.setVisible(false);
-
         });
-
-
-
     }
 
     /**
@@ -155,11 +139,10 @@ public class WelcomeViewController extends ViewController {
     @FXML
     public void showMessage(String message) {
         Platform.runLater(()->alertLabel.setText(message));
-
     }
 
     /**
-     * Shows a error message in the error message label.
+     * Shows an error message in the error message label.
      * @param message the message to be shown
      */
     @Override
@@ -172,16 +155,16 @@ public class WelcomeViewController extends ViewController {
         });
     }
 
+    /**
+     * Loads from the ClientState Model the current state and updates the GUI accordingly.
+     */
     @Override
     public void updateSceneStatus(){
-
         Platform.runLater(()->{
-            switch (ClientStateModel.getInstance().getClientState()){
-                case LOST_CONNECTION_STATE -> StageManager.loadLostConnectionScene();
-                default -> {}
+            if (Objects.requireNonNull(ClientStateModel.getInstance().getClientState()) == ClientState.LOST_CONNECTION_STATE) {
+                StageManager.loadLostConnectionScene();
             }
         });
-
     }
 
 

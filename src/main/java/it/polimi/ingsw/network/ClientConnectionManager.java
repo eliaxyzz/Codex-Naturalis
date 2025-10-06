@@ -2,7 +2,7 @@ package it.polimi.ingsw.network;
 
 import it.polimi.ingsw.client.controller.ClientController;
 import it.polimi.ingsw.network.ping.Pinger;
-import it.polimi.ingsw.network.input.InputHandler;
+import it.polimi.ingsw.network.input.NetworkInputHandler;
 import it.polimi.ingsw.util.customexceptions.ServerUnreachableException;
 import org.json.simple.JSONObject;
 import java.io.IOException;
@@ -12,12 +12,12 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * this class offers networks functionalities for the client
+ * This class offers networks functionalities for the client.
  */
 public class ClientConnectionManager implements NetworkInterface {
     private final Socket socket;
     private final PrintWriter out;
-    private final InputHandler inputHandler;
+    private final NetworkInputHandler networkInputHandler;
     private final Thread inputHandlerThread;
     private final Pinger pinger;
     private final Thread pingerThread;
@@ -32,8 +32,8 @@ public class ClientConnectionManager implements NetworkInterface {
             throw new ServerUnreachableException();
         }
 
-        inputHandler = new InputHandler(this,socket);
-        inputHandlerThread = new Thread(inputHandler);
+        networkInputHandler = new NetworkInputHandler(this,socket);
+        inputHandlerThread = new Thread(networkInputHandler);
         inputHandlerThread.start();
 
         pinger = new Pinger(this);
@@ -55,9 +55,9 @@ public class ClientConnectionManager implements NetworkInterface {
     }
 
     /**
-     * handles messages that are not meant for the higher level, but they are service messages for the proper network functionality
-     * @param message message to handle
-     * @return returns true if it was a service message, false if it's a message for the application
+     * Handles messages that are not meant for the higher level, but they are service messages for the proper network functionality.
+     * @param message The message to handle.
+     * @return true if it was a service message, false if it's a message for the application.
      */
     private boolean networkMessageHandling(JSONObject message) {
         if(message.containsKey("type")) {
@@ -84,12 +84,12 @@ public class ClientConnectionManager implements NetworkInterface {
     }
 
     /**
-     * closes every service that was open and ends the connection
+     * Closes every service that was open and ends the connection.
      */
     public void shutdown() {
         pinger.shutdown();
         out.close();
-        inputHandler.shutdown();
+        networkInputHandler.shutdown();
         inputHandlerThread.interrupt();
         pingerThread.interrupt();
         try {

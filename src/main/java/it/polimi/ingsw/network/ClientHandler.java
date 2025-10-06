@@ -1,7 +1,7 @@
 package it.polimi.ingsw.network;
 
 import it.polimi.ingsw.network.ping.Pinger;
-import it.polimi.ingsw.network.input.InputHandler;
+import it.polimi.ingsw.network.input.NetworkInputHandler;
 import it.polimi.ingsw.server.controller.GameController;
 import it.polimi.ingsw.server.lobby.Lobby;
 import it.polimi.ingsw.util.supportclasses.Request;
@@ -14,12 +14,12 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * this class offers network functionalities for the server between the server and the client
+ * This class offers network functionalities for the server between the server and the client.
  */
 public class ClientHandler implements Runnable, NetworkInterface {
     private final PrintWriter out;
     private final Socket socket;
-    private final InputHandler inputHandler;
+    private final NetworkInputHandler networkInputHandler;
     private final Thread inputHandlerThread;
     private final Pinger pinger;
     private final Thread pingerThread;
@@ -39,8 +39,8 @@ public class ClientHandler implements Runnable, NetworkInterface {
             throw new RuntimeException(e);
         }
 
-        inputHandler = new InputHandler(this,socket);
-        inputHandlerThread = new Thread(inputHandler);
+        networkInputHandler = new NetworkInputHandler(this,socket);
+        inputHandlerThread = new Thread(networkInputHandler);
         inputHandlerThread.start();
 
         pinger = new Pinger(this);
@@ -104,7 +104,7 @@ public class ClientHandler implements Runnable, NetworkInterface {
     }
 
     /**
-     * handles messages that are not meant for the higher level, but they are service messages for the proper network functionality
+     * Handles messages that are not meant for the higher level, but they are service messages for the proper network functionality.
      * @param message message to handle
      * @return returns true if it was a service message, false if it's a message for the application
      */
@@ -137,12 +137,12 @@ public class ClientHandler implements Runnable, NetworkInterface {
     }
 
     /**
-     * closes every service that was open and ends the connection
+     * Closes every service that was open and ends the connection.
      */
     public void shutdown() {
         pinger.shutdown();
         out.close();
-        inputHandler.shutdown();
+        networkInputHandler.shutdown();
         inputHandlerThread.interrupt();
         pingerThread.interrupt();
         try {

@@ -1,16 +1,18 @@
 package it.polimi.ingsw.client.model;
 
+import it.polimi.ingsw.util.supportclasses.Token;
 import org.json.simple.JSONObject;
 import java.util.ArrayList;
 import java.util.HashMap;
 
 /**
- * This class represents an ObservableModel that keeps track of the scoreboard, resources and final leaderboard information in a game
+ * This class represents an ObservableModel that keeps track of the scores, resources and final leaderboard information in a game.
  */
 public class ScoreBoardModel extends ObservableModel{
 
     private static ScoreBoardModel instance;
     private HashMap<String, Integer> scores;
+    private HashMap<String, Token> tokens;
     private ArrayList<JSONObject> leaderboard;
 
     private int insectResourceCount;
@@ -24,13 +26,12 @@ public class ScoreBoardModel extends ObservableModel{
     public ScoreBoardModel() {
         scores = new HashMap<>();
         leaderboard = new ArrayList<>();
+        tokens = new HashMap<>();
     }
 
     public static ScoreBoardModel getInstance(){
-
         if (instance ==null) instance = new ScoreBoardModel();
         return instance;
-
     }
 
     public void setMyScore(int score){
@@ -41,11 +42,19 @@ public class ScoreBoardModel extends ObservableModel{
         return leaderboard;
     }
 
+    /**
+     * Sets the leaderboard and notifies any registered observers that the data has changed.
+     * @param leaderboard The received leaderboard from the server.
+     */
     public void setLeaderboard(ArrayList<JSONObject> leaderboard){
         this.leaderboard = leaderboard;
         notifyObservers();
     }
 
+    /**
+     * Sets the players' scores and notifies any registered observers that the data has changed.
+     * @param scores The HashMap containing the scores for each player.
+     */
     public void setScores(HashMap<String, Integer> scores){
         this.scores = scores;
         notifyObservers();
@@ -55,9 +64,11 @@ public class ScoreBoardModel extends ObservableModel{
         return scores;
     }
 
-    public void setResources (int animalResourceCount, int insectResourceCount,
-                              int fungiResourceCount, int plantResourceCount, int featherCount,
-                              int scrollCount, int inkPotCount) {
+    public void setTokens(HashMap<String, Token> tokens){
+        this.tokens = tokens;
+    }
+
+    public void setResources (int animalResourceCount, int insectResourceCount, int fungiResourceCount, int plantResourceCount, int featherCount, int scrollCount, int inkPotCount) {
         this.animalResourceCount = animalResourceCount;
         this.insectResourceCount = insectResourceCount;
         this.fungiResourceCount = fungiResourceCount;
@@ -96,6 +107,14 @@ public class ScoreBoardModel extends ObservableModel{
         return inkPotCount;
     }
 
+    public Token getToken(String username){
+        if (tokens.get(username) == null) return Token.black;
+        else return tokens.get(username);
+    }
+
+    /**
+     * Resets the ScoreBoardModel.
+     */
     public void clear(){
         insectResourceCount = 0;
         animalResourceCount = 0;
@@ -105,6 +124,7 @@ public class ScoreBoardModel extends ObservableModel{
         scrollCount = 0;
         inkPotCount = 0;
         if (scores != null) scores.clear();
+        if (tokens != null) tokens.clear();
         if (leaderboard!= null) leaderboard.clear();
     }
 
