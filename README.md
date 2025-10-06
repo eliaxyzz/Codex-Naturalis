@@ -16,12 +16,12 @@
 | Network | Done✅ |
 | Controller| Done✅ | 
 | GUI |  Done✅ |
-| TUI | work in progress...⌛ |
+| TUI | Done✅ |
 | Persistence | ❌ |
 | Multiple games | Done✅ |
 | Connection resilience | ❌ |
 | Chat | ❌ |
-| Docker | work in progress...⌛ |
+| Docker | ❌ |
 
 ### Introduction
 This project is the implementation of the board game "Codex Naturalis". It's a client-server application that manages multiple clients connected to a single server. Each game has a maximum of 4 players and a server can host multiple games. Each client interacts with the server with a GUI.
