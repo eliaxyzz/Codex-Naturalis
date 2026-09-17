@@ -200,6 +200,7 @@ public class ServerView {
         serverTerminalInputReader.shutdown();
         inputThread.interrupt();
         lobby.shutdown();
+        System.exit(0);
     }
 
 

@@ -13,6 +13,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 /**
  * This class represents the lobby where players can create or join a game and set their usernames
@@ -262,7 +263,8 @@ public class Lobby implements ServerNetworkObserver {
     }
 
     /**
-     * Stops the lobby execution.
+     * Stops the lobby execution, draining the client-handling thread pool before returning.
+     * Does not terminate the JVM: the caller decides when to exit the process.
      */
     public void shutdown() {
         running = false;
@@ -271,7 +273,15 @@ public class Lobby implements ServerNetworkObserver {
         }
         if (executorService != null) {
             executorService.shutdown();
+            try {
+                executorService.awaitTermination(5, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
         }
-        System.exit(0);
+        //startLobby() is blocked on requests.take(): wake it up so it can observe running == false
+        JSONObject wakeUp = new JSONObject();
+        wakeUp.put("command", "shutdown");
+        requests.add(new Request(null, wakeUp));
     }
 }
