@@ -3,12 +3,16 @@ package it.polimi.ingsw.client.controller;
 import it.polimi.ingsw.client.model.*;
 import it.polimi.ingsw.client.view.StageManager;
 import it.polimi.ingsw.client.view.utility.CardRepresentation;
+import it.polimi.ingsw.util.customexceptions.InvalidMessageException;
 import it.polimi.ingsw.util.supportclasses.ClientState;
+import it.polimi.ingsw.util.supportclasses.RequestFields;
 import it.polimi.ingsw.util.supportclasses.Token;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Map;
+import java.util.function.Consumer;
 
 /**
  * This class is responsible for handling incoming JSON messages from the server.
@@ -16,39 +20,53 @@ import java.util.HashMap;
  */
 public class ClientMessageHandler {
 
+    private final Map<String, Consumer<JSONObject>> handlers = new HashMap<>();
+
+    public ClientMessageHandler() {
+        //in-lobby messages
+        handlers.put("joinedLobby", message -> updateClientState(ClientState.LOBBY_STATE, "Joined Lobby"));
+        handlers.put("usernameSet", this::updateUsername);
+        handlers.put("usernameAlreadyTaken", message -> showError("Username Already Taken"));
+        handlers.put("gameCreated", message -> updateClientState(ClientState.GAME_SETUP_STATE, "Game Created Successfully"));
+        handlers.put("joinGame", message -> updateClientState(ClientState.GAME_SETUP_STATE, "Joined Game Successfully"));
+        handlers.put("cannotCreateGame", message -> showError(RequestFields.getString(message, "reason")));
+        handlers.put("gameDoesNotExist", message -> showError("The selected game does not exist"));
+        handlers.put("gameIsFull", message -> showError("The selected game is full"));
+        handlers.put("availableGames", this::updateAvailableGames);
+        //in-game messages
+        handlers.put("cardsSelection", this::updateSelectableCards);
+        handlers.put("startGame", this::updateInitialBoardState);
+        handlers.put("updatedDecks", this::updateDecks);
+        handlers.put("updatedHand", this::updateHand);
+        handlers.put("successfulPlace", this::updateGameField);
+        handlers.put("cannotPlace", this::cannotPlaceHandler);
+        handlers.put("cannotDraw", message -> showError(RequestFields.getString(message, "reason")));
+        handlers.put("invalidSelection", message -> showError(RequestFields.getString(message, "reason")));
+        handlers.put("turnPlayerUpdate", this::updateTurnPlayer);
+        handlers.put("updatedScores", this::updateScores);
+        handlers.put("closingGame", message -> updateClientState(ClientState.KICKED_STATE));
+        handlers.put("lastRound", this::handleLastRound);
+        handlers.put("leaderBoard", this::updateLeaderboard);
+    }
+
     /**
      * Processes an incoming JSON message from the server.
      * @param message The JSONObject representing the received message.
      */
     public void execute (JSONObject message) {
-
-        switch (message.get("message").toString()) {
-            //in-lobby messages
-            case "joinedLobby" -> updateClientState(ClientState.LOBBY_STATE, "Joined Lobby");
-            case "usernameSet" -> updateUsername(message);
-            case "usernameAlreadyTaken" -> showError("Username Already Taken");
-            case "gameCreated" -> updateClientState(ClientState.GAME_SETUP_STATE, "Game Created Successfully");
-            case "joinGame" -> updateClientState(ClientState.GAME_SETUP_STATE, "Joined Game Successfully");
-            case "cannotCreateGame" -> showError(message.get("reason").toString());
-            case "gameDoesNotExist" -> showError( "The selected game does not exist");
-            case "gameIsFull" -> showError( "The selected game is full");
-            case "availableGames" -> updateAvailableGames(message);
-            //in-game messages
-            case "cardsSelection" -> updateSelectableCards(message);
-            case "startGame" -> updateInitialBoardState(message);
-            case "updatedDecks" -> updateDecks(message);
-            case "updatedHand" -> updateHand(message);
-            case "successfulPlace" -> updateGameField(message);
-            case "cannotPlace" -> cannotPlaceHandler(message);
-            case "cannotDraw" -> showError(message.get("reason").toString());
-            case "invalidSelection" -> showError(message.get("reason").toString());
-            case "turnPlayerUpdate" -> updateTurnPlayer(message);
-            case "updatedScores" -> updateScores(message);
-            case "closingGame" -> updateClientState(ClientState.KICKED_STATE);
-            case "lastRound" -> handleLastRound(message);
-            case "leaderBoard" -> updateLeaderboard(message);
-            default -> { //do nothing
-            }
+        String messageType;
+        try {
+            messageType = RequestFields.getString(message, "message");
+        } catch (InvalidMessageException e) {
+            System.out.println("Discarding malformed message from server: " + e.getMessage());
+            return;
+        }
+        Consumer<JSONObject> handler = handlers.get(messageType);
+        if (handler == null) return; //unrecognized message, discarded
+        try {
+            handler.accept(message);
+        } catch (RuntimeException e) {
+            System.out.println("Discarding malformed '" + messageType + "' message from server: " + e.getMessage());
         }
     }
 

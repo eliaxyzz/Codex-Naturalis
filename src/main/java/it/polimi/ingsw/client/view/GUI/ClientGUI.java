@@ -1,8 +1,10 @@
 package it.polimi.ingsw.client.view.GUI;
 
+import it.polimi.ingsw.client.controller.ClientController;
 import it.polimi.ingsw.client.view.StageManager;
 import it.polimi.ingsw.client.view.observers.*;
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.scene.image.Image;
 import javafx.stage.Stage;
 import java.io.InputStream;
@@ -36,5 +38,14 @@ public class ClientGUI extends Application {
         StageManager.setCurrentStage(primaryStage);
         StageManager.loadTitleScreenScene();
         primaryStage.setTitle("Codex Naturalis");
+    }
+
+    /**
+     * Closes the connection to the server and terminates the GUI application.
+     */
+    public static void exit() {
+        ClientController.getInstance().shutdown();
+        Platform.exit();
+        System.exit(0);
     }
 }

@@ -4,18 +4,30 @@ import it.polimi.ingsw.network.ClientHandler;
 import it.polimi.ingsw.util.customexceptions.AlreadyTakenUsernameException;
 import it.polimi.ingsw.util.customexceptions.CannotCreateGameException;
 import it.polimi.ingsw.util.customexceptions.GameIsFullException;
+import it.polimi.ingsw.util.customexceptions.InvalidMessageException;
 import it.polimi.ingsw.util.customexceptions.NonExistentGameException;
 import it.polimi.ingsw.util.supportclasses.Request;
+import it.polimi.ingsw.util.supportclasses.RequestCommand;
+import it.polimi.ingsw.util.supportclasses.RequestFields;
 import org.json.simple.JSONObject;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * This class represents the request parser of the exchanged messages.
  */
 public class LobbyRequestHandler {
     private final Lobby lobby;
+    private final Map<String, RequestCommand> commands = new HashMap<>();
 
     public LobbyRequestHandler(Lobby lobby) {
         this.lobby = lobby;
+        commands.put("setUsername", (client, message) -> setUsername(lobby, message, client));
+        commands.put("getAvailableGames", (client, message) -> getAvailableGames(lobby, client));
+        commands.put("setUp", (client, message) -> setUpGame(lobby, message, client));
+        commands.put("join", (client, message) -> joinGame(lobby, message, client));
+        commands.put("leave", (client, message) -> leaveLobby(lobby, client));
+        commands.put("connectionLost", (client, message) -> leaveLobby(lobby, client));
     }
     /**
      * Handles the incoming request from a client
@@ -24,15 +36,19 @@ public class LobbyRequestHandler {
     public void execute(Request request) {
         JSONObject message = request.message();
         ClientHandler clientHandler = request.client();
-        switch (message.get("command").toString()) {
-            case "setUsername" -> setUsername(lobby, message, clientHandler);
-            case "getAvailableGames" -> getAvailableGames(lobby,clientHandler);
-            case "setUp" -> setUpGame(lobby,message,clientHandler);
-            case "join" -> joinGame(lobby,message,clientHandler);
-            case "leave", "connectionLost" -> leaveLobby(lobby,clientHandler);
-            default -> {
-                //do nothing (request discarded)
-            }
+        String command;
+        try {
+            command = RequestFields.getCommand(message);
+        } catch (InvalidMessageException e) {
+            System.out.println("Discarding malformed request from client: " + e.getMessage());
+            return;
+        }
+        RequestCommand handler = commands.get(command);
+        if (handler == null) return; //unrecognized command, discarded
+        try {
+            handler.execute(clientHandler, message);
+        } catch (InvalidMessageException e) {
+            System.out.println("Discarding malformed '" + command + "' request from client: " + e.getMessage());
         }
     }
 
@@ -44,7 +60,7 @@ public class LobbyRequestHandler {
      */
     private void setUsername(Lobby lobby, JSONObject message, ClientHandler clientHandler) {
         try {
-            lobby.setUsername(message.get("username").toString(),clientHandler);
+            lobby.setUsername(RequestFields.getString(message, "username"),clientHandler);
             clientHandler.send(LobbyMessageGenerator.usernameSetMessage(clientHandler.getUsername()));
         } catch (AlreadyTakenUsernameException e) {
              clientHandler.send(LobbyMessageGenerator.usernameAlreadyTakenMessage());
@@ -68,8 +84,8 @@ public class LobbyRequestHandler {
      * @param clientHandler client handler of client
      */
     private void setUpGame(Lobby lobby, JSONObject message, ClientHandler clientHandler) {
-        int numberOfPlayers = Integer.parseInt(message.get("numOfPlayers").toString());
-        String gameName = message.get("gameName").toString();
+        int numberOfPlayers = RequestFields.getInt(message, "numOfPlayers");
+        String gameName = RequestFields.getString(message, "gameName");
 
         try {
             lobby.setupNewGame(numberOfPlayers,gameName,clientHandler);
@@ -86,7 +102,7 @@ public class LobbyRequestHandler {
      * @param clientHandler client handler of client
      */
     private void joinGame(Lobby lobby, JSONObject message, ClientHandler clientHandler) {
-        String gameName = message.get("gameName").toString();
+        String gameName = RequestFields.getString(message, "gameName");
         try {
             lobby.joinGame(clientHandler,gameName);
             clientHandler.send(LobbyMessageGenerator.joinGameMessage(gameName));

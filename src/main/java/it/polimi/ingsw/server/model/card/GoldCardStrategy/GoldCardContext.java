@@ -24,9 +24,14 @@ public class GoldCardContext {
         return strategy.calculatePoints(pointsOnTheCard, gamefield,goldcard );
     }
 
+    /**
+     * Two contexts are equal when they wrap the same kind of strategy (the strategies
+     * themselves are stateless, so comparing their class is enough).
+     */
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        return o != null && this.getClass() == o.getClass();
+        if (!(o instanceof GoldCardContext other)) return false;
+        return this.strategy.getClass() == other.strategy.getClass();
     }
 }
