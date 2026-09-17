@@ -40,6 +40,8 @@ public class ClientMessageHandler {
             case "updatedHand" -> updateHand(message);
             case "successfulPlace" -> updateGameField(message);
             case "cannotPlace" -> cannotPlaceHandler(message);
+            case "cannotDraw" -> showError(message.get("reason").toString());
+            case "invalidSelection" -> showError(message.get("reason").toString());
             case "turnPlayerUpdate" -> updateTurnPlayer(message);
             case "updatedScores" -> updateScores(message);
             case "closingGame" -> updateClientState(ClientState.KICKED_STATE);

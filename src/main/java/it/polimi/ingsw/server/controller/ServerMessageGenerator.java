@@ -122,6 +122,30 @@ public class ServerMessageGenerator {
     }
 
     /**
+     * This message is sent when a player cannot draw a card for a particular reason.
+     * @param reason The reason that explains why the draw is invalid.
+     * @return The message to the player.
+     */
+    public JSONObject cannotDrawMessage(String reason) {
+        Map<String,String> jsonMap = new HashMap<>();
+        jsonMap.put("message", "cannotDraw");
+        jsonMap.put("reason",  reason);
+        return new JSONObject(jsonMap);
+    }
+
+    /**
+     * This message is sent when a player's starter card or secret objective selection doesn't match one of their drawn cards.
+     * @param reason The reason that explains why the selection is invalid.
+     * @return The message to the player.
+     */
+    public JSONObject invalidSelectionMessage(String reason) {
+        Map<String,String> jsonMap = new HashMap<>();
+        jsonMap.put("message", "invalidSelection");
+        jsonMap.put("reason",  reason);
+        return new JSONObject(jsonMap);
+    }
+
+    /**
      * This message is sent to notify players' updated scores after each turn.
      * @param gameController The game controller of the current game.
      * @return The message containing all the players' scores.

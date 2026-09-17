@@ -75,7 +75,9 @@ public class GameRequestHandler {
     private void chooseStarterCardOrientation(JSONObject message, ClientHandler client) {
         int starterCardId =Integer.parseInt(message.get("starterCardId").toString());
         boolean facingUp= Boolean.parseBoolean(message.get("facingUp").toString());
-        gameController.chooseStarterCardSide(client,starterCardId, facingUp);
+        if (!gameController.chooseStarterCardSide(client, starterCardId, facingUp)) {
+            client.send(messageGenerator.invalidSelectionMessage("That's not your starter card"));
+        }
     }
 
     /**
@@ -85,7 +87,9 @@ public class GameRequestHandler {
      */
     private void chooseSecretObjectiveCard(JSONObject message, ClientHandler client) {
         int objectiveCardId =Integer.parseInt(message.get("objectiveCardId").toString());
-        gameController.chooseSecretObjectiveCard(client, objectiveCardId);
+        if (!gameController.chooseSecretObjectiveCard(client, objectiveCardId)) {
+            client.send(messageGenerator.invalidSelectionMessage("That's not one of your drawn objective cards"));
+        }
     }
 
     /**
@@ -97,7 +101,15 @@ public class GameRequestHandler {
             gameController.directDrawResourceCard(client);
             client.send(messageGenerator.updatedHandMessage(gameController.getCurrentPlayer(client)));
             gameController.broadcast(messageGenerator.updatedDecksMessage());
-        } catch (EmptyDeckException | CannotDrawException | NotYourTurnException | FullHandException ignored) {}
+        } catch (EmptyDeckException e) {
+            client.send(messageGenerator.cannotDrawMessage("The deck is empty"));
+        } catch (CannotDrawException e) {
+            client.send(messageGenerator.cannotDrawMessage("You must place a card before drawing"));
+        } catch (NotYourTurnException e) {
+            client.send(messageGenerator.cannotDrawMessage("It's not your turn"));
+        } catch (FullHandException e) {
+            client.send(messageGenerator.cannotDrawMessage("Your hand is already full"));
+        }
     }
 
     /**
@@ -109,8 +121,15 @@ public class GameRequestHandler {
             gameController.directDrawGoldCard(client);
             client.send(messageGenerator.updatedHandMessage(gameController.getCurrentPlayer(client)));
             gameController.broadcast(messageGenerator.updatedDecksMessage());
+        } catch (EmptyDeckException e) {
+            client.send(messageGenerator.cannotDrawMessage("The deck is empty"));
+        } catch (CannotDrawException e) {
+            client.send(messageGenerator.cannotDrawMessage("You must place a card before drawing"));
+        } catch (NotYourTurnException e) {
+            client.send(messageGenerator.cannotDrawMessage("It's not your turn"));
+        } catch (FullHandException e) {
+            client.send(messageGenerator.cannotDrawMessage("Your hand is already full"));
         }
-        catch (EmptyDeckException | CannotDrawException | NotYourTurnException | FullHandException ignored) {}
     }
 
     /**
@@ -122,8 +141,13 @@ public class GameRequestHandler {
             gameController.drawLeftRevealedResourceCard(client);
             client.send(messageGenerator.updatedHandMessage(gameController.getCurrentPlayer(client)));
             gameController.broadcast(messageGenerator.updatedDecksMessage());
+        } catch (CannotDrawException e) {
+            client.send(messageGenerator.cannotDrawMessage("You must place a card before drawing"));
+        } catch (NotYourTurnException e) {
+            client.send(messageGenerator.cannotDrawMessage("It's not your turn"));
+        } catch (FullHandException e) {
+            client.send(messageGenerator.cannotDrawMessage("Your hand is already full"));
         }
-        catch (FullHandException | CannotDrawException | NotYourTurnException ignored) {}
     }
 
     /**
@@ -135,7 +159,13 @@ public class GameRequestHandler {
             gameController.drawRightRevealedResourceCard(client);
             client.send(messageGenerator.updatedHandMessage(gameController.getCurrentPlayer(client)));
             gameController.broadcast(messageGenerator.updatedDecksMessage());
-        } catch (FullHandException | CannotDrawException | NotYourTurnException ignored) {}
+        } catch (CannotDrawException e) {
+            client.send(messageGenerator.cannotDrawMessage("You must place a card before drawing"));
+        } catch (NotYourTurnException e) {
+            client.send(messageGenerator.cannotDrawMessage("It's not your turn"));
+        } catch (FullHandException e) {
+            client.send(messageGenerator.cannotDrawMessage("Your hand is already full"));
+        }
     }
 
     /**
@@ -147,7 +177,13 @@ public class GameRequestHandler {
             gameController.drawLeftRevealedGoldCard(client);
             client.send(messageGenerator.updatedHandMessage(gameController.getCurrentPlayer(client)));
             gameController.broadcast(messageGenerator.updatedDecksMessage());
-        } catch (FullHandException | CannotDrawException | NotYourTurnException ignored) {}
+        } catch (CannotDrawException e) {
+            client.send(messageGenerator.cannotDrawMessage("You must place a card before drawing"));
+        } catch (NotYourTurnException e) {
+            client.send(messageGenerator.cannotDrawMessage("It's not your turn"));
+        } catch (FullHandException e) {
+            client.send(messageGenerator.cannotDrawMessage("Your hand is already full"));
+        }
     }
 
     /**
@@ -159,7 +195,13 @@ public class GameRequestHandler {
             gameController.drawRightRevealedGoldCard(client);
             client.send(messageGenerator.updatedHandMessage(gameController.getCurrentPlayer(client)));
             gameController.broadcast(messageGenerator.updatedDecksMessage());
-        } catch (FullHandException | CannotDrawException | NotYourTurnException ignored) {}
+        } catch (CannotDrawException e) {
+            client.send(messageGenerator.cannotDrawMessage("You must place a card before drawing"));
+        } catch (NotYourTurnException e) {
+            client.send(messageGenerator.cannotDrawMessage("It's not your turn"));
+        } catch (FullHandException e) {
+            client.send(messageGenerator.cannotDrawMessage("Your hand is already full"));
+        }
     }
 
     /**

@@ -39,7 +39,7 @@ public class NetworkInputHandler implements Runnable {
                     }
                 }
             } catch (ParseException e) {
-                throw new RuntimeException(e); //should not happen
+                System.out.println("Discarding malformed message from client: " + e.getMessage());
             }
         }
     }

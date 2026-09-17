@@ -260,7 +260,7 @@ public class GameController implements Runnable, ServerNetworkObserver, GameObse
         try {
             getCurrentPlayer(client).place(placeableCardId, facingUp, x, y);
         } catch (CardNotInHandException e) {
-            throw new CannotPlaceCardException("The card is not in your hand"); //should never happen
+            throw new CannotPlaceCardException("The card is not in your hand");
         }
         broadcast(messageGenerator.updatedScoresMessage(this));
         if(echo) System.out.println("In game '" + gameName + "' player '" + client.getUsername() + "' placed the card " + placeableCardId + " at X:" + x + " Y:" + y);
@@ -405,8 +405,9 @@ public class GameController implements Runnable, ServerNetworkObserver, GameObse
      * @param client The player that selected the orientation.
      * @param starterCardId The starter card id.
      * @param facingUp The orientation: true if the front is facing up, false otherwise.
+     * @return true if the id matched the player's starter card, false otherwise.
      */
-    public void chooseStarterCardSide(ClientHandler client, int starterCardId, boolean facingUp) {
+    public boolean chooseStarterCardSide(ClientHandler client, int starterCardId, boolean facingUp) {
         Player currentPlayer = getCurrentPlayer(client);
         if (currentPlayer.getStarterCard().getId() == starterCardId) {
             currentPlayer.place(currentPlayer.getStarterCard(), facingUp);
@@ -417,15 +418,18 @@ public class GameController implements Runnable, ServerNetworkObserver, GameObse
                 System.out.println("In game '"+ gameName + "' player '" + client.getUsername() + "' chose to play their starter card on the " + side);
             }
             currentPlayer.setStarterCardOrientationSelected(true);
+            return true;
         }
+        return false;
     }
 
     /**
      * Selects the chosen secret objective between the two drawn objective cards.
      * @param client The player choosing the secret objective.
      * @param objectiveCardId The chosen secret objective card id.
+     * @return true if the id matched one of the two drawn objective cards, false otherwise.
      */
-    public void chooseSecretObjectiveCard (ClientHandler client,int objectiveCardId){
+    public boolean chooseSecretObjectiveCard (ClientHandler client,int objectiveCardId){
         Player currentPlayer = getCurrentPlayer(client);
         for(ObjectiveCard drawnObjectiveCard : currentPlayer.getDrawnObjectiveCards())
             if (drawnObjectiveCard.getId() == objectiveCardId) {
@@ -433,7 +437,9 @@ public class GameController implements Runnable, ServerNetworkObserver, GameObse
                 if (echo) {
                     System.out.println("In game '"+ gameName + "' player '" + client.getUsername() + "' chose to the secret objective " + objectiveCardId);
                 }
+                return true;
             }
+        return false;
     }
 
     /**
