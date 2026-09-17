@@ -259,6 +259,7 @@ public class Lobby implements ServerNetworkObserver {
     }
 
     @Override
+    @SuppressWarnings("unchecked") //JSONObject.put is raw-typed in json-simple, nothing we can do about it here
     public void notifyConnectionLoss(ClientHandler clientHandler) {
         if (echo) {
             System.out.println("Client '" + clientHandler.getUsername() + "' lost connection");
@@ -272,6 +273,7 @@ public class Lobby implements ServerNetworkObserver {
      * Stops the lobby execution, draining the client-handling thread pool before returning.
      * Does not terminate the JVM: the caller decides when to exit the process.
      */
+    @SuppressWarnings("unchecked") //JSONObject.put is raw-typed in json-simple, nothing we can do about it here
     public void shutdown() {
         running = false;
         if (serverWelcomeSocket != null) {
@@ -280,7 +282,10 @@ public class Lobby implements ServerNetworkObserver {
         if (executorService != null) {
             executorService.shutdown();
             try {
-                executorService.awaitTermination(5, TimeUnit.SECONDS);
+                boolean terminatedCleanly = executorService.awaitTermination(5, TimeUnit.SECONDS);
+                if (!terminatedCleanly) {
+                    System.out.println("Lobby shutdown: some client-handling tasks didn't finish within the timeout");
+                }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }

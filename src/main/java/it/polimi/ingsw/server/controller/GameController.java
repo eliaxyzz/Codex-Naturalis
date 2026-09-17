@@ -442,6 +442,7 @@ public class GameController implements Runnable, ServerNetworkObserver, GameObse
     }
 
     @Override
+    @SuppressWarnings("unchecked") //JSONObject.put is raw-typed in json-simple, nothing we can do about it here
     public void notifyConnectionLoss (ClientHandler client) {
         if (echo) {
             System.out.println("In game '" + gameName + "' player '" + client.getUsername() + "' disconnected");

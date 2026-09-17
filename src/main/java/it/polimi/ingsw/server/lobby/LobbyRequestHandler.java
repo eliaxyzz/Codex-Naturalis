@@ -22,12 +22,12 @@ public class LobbyRequestHandler {
 
     public LobbyRequestHandler(Lobby lobby) {
         this.lobby = lobby;
-        commands.put("setUsername", (client, message) -> setUsername(lobby, message, client));
-        commands.put("getAvailableGames", (client, message) -> getAvailableGames(lobby, client));
-        commands.put("setUp", (client, message) -> setUpGame(lobby, message, client));
-        commands.put("join", (client, message) -> joinGame(lobby, message, client));
-        commands.put("leave", (client, message) -> leaveLobby(lobby, client));
-        commands.put("connectionLost", (client, message) -> leaveLobby(lobby, client));
+        commands.put("setUsername", (client, message) -> setUsername(message, client));
+        commands.put("getAvailableGames", (client, message) -> getAvailableGames(client));
+        commands.put("setUp", (client, message) -> setUpGame(message, client));
+        commands.put("join", (client, message) -> joinGame(message, client));
+        commands.put("leave", (client, message) -> leaveLobby(client));
+        commands.put("connectionLost", (client, message) -> leaveLobby(client));
     }
     /**
      * Handles the incoming request from a client
@@ -54,11 +54,10 @@ public class LobbyRequestHandler {
 
     /**
      * Handles the logic for setting a username for a client.
-     * @param lobby lobby reference
      * @param message json object message
      * @param clientHandler client handler of client
      */
-    private void setUsername(Lobby lobby, JSONObject message, ClientHandler clientHandler) {
+    private void setUsername(JSONObject message, ClientHandler clientHandler) {
         try {
             lobby.setUsername(RequestFields.getString(message, "username"),clientHandler);
             clientHandler.send(LobbyMessageGenerator.usernameSetMessage(clientHandler.getUsername()));
@@ -70,20 +69,18 @@ public class LobbyRequestHandler {
 
     /**
      * retrieves a list of available games from the lobby and sends them to the requesting client
-     * @param lobby lobby reference
      * @param clientHandler client handler of client
      */
-    private void getAvailableGames(Lobby lobby, ClientHandler clientHandler) {
+    private void getAvailableGames(ClientHandler clientHandler) {
         clientHandler.send(LobbyMessageGenerator.getAvailableGamesMessage(lobby.getAvailableGames()));
     }
 
     /**
      * processes a request to create a new game
-     * @param lobby lobby reference
      * @param message json object message
      * @param clientHandler client handler of client
      */
-    private void setUpGame(Lobby lobby, JSONObject message, ClientHandler clientHandler) {
+    private void setUpGame(JSONObject message, ClientHandler clientHandler) {
         int numberOfPlayers = RequestFields.getInt(message, "numOfPlayers");
         String gameName = RequestFields.getString(message, "gameName");
 
@@ -97,11 +94,10 @@ public class LobbyRequestHandler {
 
     /**
      * handles a client's request to join a game
-     * @param lobby lobby reference
      * @param message json object message
      * @param clientHandler client handler of client
      */
-    private void joinGame(Lobby lobby, JSONObject message, ClientHandler clientHandler) {
+    private void joinGame(JSONObject message, ClientHandler clientHandler) {
         String gameName = RequestFields.getString(message, "gameName");
         try {
             lobby.joinGame(clientHandler,gameName);
@@ -116,10 +112,9 @@ public class LobbyRequestHandler {
 
     /**
      * removes a client from the lobby when they choose to leave
-     * @param lobby lobby reference
      * @param clientHandler client handler of client
      */
-    private void leaveLobby(Lobby lobby, ClientHandler clientHandler) {
+    private void leaveLobby(ClientHandler clientHandler) {
         lobby.leaveLobby(clientHandler);
     }
 
