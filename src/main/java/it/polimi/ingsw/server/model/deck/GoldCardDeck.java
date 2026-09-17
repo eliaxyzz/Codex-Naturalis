@@ -8,7 +8,7 @@ import java.util.Collections;
 /**
  * This class represents the gold card deck.
  */
-public class GoldCardDeck extends DeckWithRevealedCards {
+public class GoldCardDeck extends DeckWithRevealedCards<GoldCard> {
     public GoldCardDeck(){
         cards = new ArrayList<>();
         for (int i=41; i<81; i++) {

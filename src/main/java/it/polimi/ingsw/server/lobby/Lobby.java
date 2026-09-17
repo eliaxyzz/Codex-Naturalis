@@ -10,21 +10,26 @@ import it.polimi.ingsw.util.supportclasses.Request;
 import org.json.simple.JSONObject;
 import java.util.*;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 /**
- * This class represents the lobby where players can create or join a game and set their usernames
+ * This class represents the lobby where players can create or join a game and set their usernames.
+ * Its state is reachable from more than one thread at once (the welcome socket hands off new
+ * connections directly, and each game's own thread calls back in on disconnects and game-start),
+ * so the collections below need to be thread-safe rather than plain ArrayList/HashMap.
  */
 public class Lobby implements ServerNetworkObserver {
 
     private final BlockingQueue<Request> requests;
-    private final ArrayList<ClientHandler> connectedClients;
-    private final HashMap<String, GameController> games;
-    private final HashMap<String, GameController> availableGames;
-    private final ArrayList<String> takenUsernames;
+    private final List<ClientHandler> connectedClients;
+    private final Map<String, GameController> games;
+    private final Map<String, GameController> availableGames;
+    private final List<String> takenUsernames;
     private ServerWelcomeSocket serverWelcomeSocket = null;
     private boolean welcomeSocketIsRunning = false;
     private int welcomeSocketPort;
@@ -34,10 +39,10 @@ public class Lobby implements ServerNetworkObserver {
     private volatile boolean running;
 
     public Lobby() {
-        connectedClients = new ArrayList<>();
-        games = new HashMap<>();
-        availableGames = new HashMap<>();
-        takenUsernames = new ArrayList<>();
+        connectedClients = new CopyOnWriteArrayList<>();
+        games = new ConcurrentHashMap<>();
+        availableGames = new ConcurrentHashMap<>();
+        takenUsernames = new CopyOnWriteArrayList<>();
         requests = new LinkedBlockingQueue<>();
         executorService = Executors.newCachedThreadPool();
         lobbyRequestHandler = new LobbyRequestHandler(this);
@@ -63,15 +68,15 @@ public class Lobby implements ServerNetworkObserver {
         else throw new WelcomeSocketIsAlreadyOpenException(String.valueOf(welcomeSocketPort));
     }
 
-    public HashMap<String, GameController> getAvailableGames() {
+    public Map<String, GameController> getAvailableGames() {
         return availableGames;
     }
 
-    public HashMap<String, GameController> getGames() {
+    public Map<String, GameController> getGames() {
         return games;
     }
 
-    public ArrayList<ClientHandler> getConnectedClients() {
+    public List<ClientHandler> getConnectedClients() {
         return connectedClients;
     }
 
@@ -248,8 +253,9 @@ public class Lobby implements ServerNetworkObserver {
      * @throws NonExistentGameException Thrown when the given game name isn't the name of one of the available games to join.
      */
     public void joinGame(ClientHandler client, String gameName) throws NonExistentGameException, GameIsFullException {
-        if(!availableGames.containsKey(gameName)) { throw new NonExistentGameException(); }
-        availableGames.get(gameName).enterGame(client);
+        GameController gameController = availableGames.get(gameName);
+        if (gameController == null) { throw new NonExistentGameException(); }
+        gameController.enterGame(client);
     }
 
     @Override

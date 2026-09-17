@@ -103,7 +103,7 @@ public class LobbyMessageGenerator {
      * @return JSON message.
      */
     @SuppressWarnings("all")
-    public static JSONObject getAvailableGamesMessage(HashMap<String, GameController> availableGames) {
+    public static JSONObject getAvailableGamesMessage(Map<String, GameController> availableGames) {
         JSONObject message = new JSONObject();
         message.put("message", "availableGames");
         JSONArray games = new JSONArray();

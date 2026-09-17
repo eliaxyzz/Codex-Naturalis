@@ -94,20 +94,18 @@ public class Player {
     }
 
     /**
-     * sets the player state to ready and notifies the GameObserver
+     * sets the player state to ready
      * @param ready is the state of the player
      */
     public void setReady(boolean ready) {
         isReady = ready;
-        game.getGameObserver().notifyReady();
     }
     /**
-     * sets the starter-card orientation chosen by the player and notifies the GameObserver
+     * sets the starter-card orientation chosen by the player
      * @param starterCardOrientationSelected is the orientation selected by the player
      */
     public void setStarterCardOrientationSelected(boolean starterCardOrientationSelected) {
         this.starterCardOrientationSelected = starterCardOrientationSelected;
-        game.getGameObserver().notifyStarterCardAndSecretObjectiveSelected();
     }
 
     /**
@@ -116,20 +114,19 @@ public class Player {
     public void initializeHand() {
         hand.clear();
         try {
-            addToHand((ResourceCard) game.getResourceCardDeck().directDraw());
-            addToHand((ResourceCard) game.getResourceCardDeck().directDraw());
-            addToHand((GoldCard) game.getGoldCardDeck().directDraw());
+            addToHand(game.getResourceCardDeck().directDraw());
+            addToHand(game.getResourceCardDeck().directDraw());
+            addToHand(game.getGoldCardDeck().directDraw());
         } catch (FullHandException | EmptyDeckException ignored) {
         }
     }
 
     /**
-     * updates the player's score and notifies the GameObserver
+     * updates the player's score
      * @param newScore is the player's updated score
      */
     public void setScore(int newScore) {
         this.score = newScore;
-        game.getGameObserver().notifyLastRound();
     }
 
     /**
@@ -147,7 +144,6 @@ public class Player {
     public void setSecretObjective(ObjectiveCard objectiveCard) {
         if(this.secretObjective != null) return;
         this.secretObjective = objectiveCard;
-        game.getGameObserver().notifyStarterCardAndSecretObjectiveSelected();
     }
 
     /**

@@ -6,17 +6,18 @@ import java.util.ArrayList;
 
 /**
  * This abstract class represents a general Deck of cards.
+ * @param <T> The type of card held by the deck.
  */
-public abstract class Deck {
-    protected ArrayList<Card> cards;
+public abstract class Deck<T extends Card> {
+    protected ArrayList<T> cards;
 
     /**
      * Draws the top card from the deck.
      * @throws EmptyDeckException If the deck is empty when trying to draw a card.
      * @return The drawn card.
      */
-    public Card directDraw() throws EmptyDeckException {
-        Card drawnCard;
+    public T directDraw() throws EmptyDeckException {
+        T drawnCard;
         if(cards.isEmpty()) {
             throw new EmptyDeckException();
         }

@@ -1,6 +1,5 @@
 package it.polimi.ingsw.server.model;
 
-import it.polimi.ingsw.server.controller.GameObserver;
 import it.polimi.ingsw.server.model.card.ObjectiveCard;
 import it.polimi.ingsw.server.model.deck.GoldCardDeck;
 import it.polimi.ingsw.server.model.deck.ObjectiveCardDeck;
@@ -12,11 +11,14 @@ import it.polimi.ingsw.util.supportclasses.GameState;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * This class represents the core game model, managing the game state, decks, players, and overall game logic.
  * It interacts with other components to receive player actions and update the game state accordingly.
+ * players is a ConcurrentHashMap because a player joining is handled on the lobby's thread while
+ * this game's own thread reads and writes it constantly once play starts.
  */
 public class Game {
     private int numberOfPlayers;
@@ -28,14 +30,13 @@ public class Game {
     private final GoldCardDeck goldCardDeck;
     private final StarterCardDeck starterCardDeck;
     private final ArrayList<ObjectiveCard> commonObjectives;
-    private final HashMap<String, Player> players;
+    private final Map<String, Player> players;
 
-    private GameObserver gameObserver;
     private final ArrayList<Token> availableTokens;
 
-    public Game(int numberOfPlayers, GameObserver gameObserver) {
+    public Game(int numberOfPlayers) {
         this.setNumberOfPlayers(numberOfPlayers);
-        players = new HashMap<>();
+        players = new ConcurrentHashMap<>();
         objectiveCardDeck = new ObjectiveCardDeck();
         resourceCardDeck = new ResourceCardDeck();
         goldCardDeck = new GoldCardDeck();
@@ -43,12 +44,11 @@ public class Game {
         commonObjectives = new ArrayList<>();
         availableTokens = new ArrayList<>(Arrays.asList(Token.red, Token.yellow, Token.green, Token.blue));
         try {
-            commonObjectives.add((ObjectiveCard) objectiveCardDeck.directDraw());
-            commonObjectives.add((ObjectiveCard) objectiveCardDeck.directDraw());
+            commonObjectives.add(objectiveCardDeck.directDraw());
+            commonObjectives.add(objectiveCardDeck.directDraw());
         } catch (EmptyDeckException ignored) {
         }
         gameState = GameState.waitingForPlayers;
-        this.setGameObserver(gameObserver);
     }
     public GameState getGameState() {
         return gameState;
@@ -61,7 +61,7 @@ public class Game {
         return getAvailableTokens().removeFirst();
     }
 
-    public HashMap<String, Player> getPlayersHashMap() { return players;}
+    public Map<String, Player> getPlayersHashMap() { return players;}
 
     public ArrayList<Player> getPlayers() {
         return new ArrayList<>(players.values());
@@ -110,14 +110,6 @@ public class Game {
 
     public ArrayList<ObjectiveCard> getCommonObjectives() {
         return commonObjectives;
-    }
-
-    public GameObserver getGameObserver() {
-        return gameObserver;
-    }
-
-    public void setGameObserver(GameObserver gameObserver) {
-        this.gameObserver = gameObserver;
     }
 
     public ArrayList<Token> getAvailableTokens() {

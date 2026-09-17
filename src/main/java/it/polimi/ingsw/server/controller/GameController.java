@@ -14,16 +14,19 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.LinkedBlockingQueue;
 import static it.polimi.ingsw.util.supportclasses.Constants.SCORE_GOAL;
 
 /**
  * This class manages the logic of a game instance. It acts as the central controller
  *  for the game, coordinating interactions between players, the game model and the server network.
+ * clientHandlers is a CopyOnWriteArrayList because it's written from the lobby's thread
+ * (a player joining) while this game's own thread reads it constantly (broadcast, turn checks).
  */
 public class GameController implements Runnable, ServerNetworkObserver, GameObserver {
     private final String gameName;
-    private final ArrayList<ClientHandler> clientHandlers;
+    private final List<ClientHandler> clientHandlers;
     private final Lobby lobby;
     private final Game game;
     private final BlockingQueue<Request> requests;
@@ -34,12 +37,12 @@ public class GameController implements Runnable, ServerNetworkObserver, GameObse
 
     public GameController(Lobby lobby, int numberOfPlayers, String gameName, boolean echo) {
         this.gameName = gameName;
-        this.clientHandlers = new ArrayList<>();
+        this.clientHandlers = new CopyOnWriteArrayList<>();
         this.lobby = lobby;
         this.requests = new LinkedBlockingQueue<>();
         this.echo = echo;
         running = true;
-        this.game = new Game(numberOfPlayers,this);
+        this.game = new Game(numberOfPlayers);
         this.messageGenerator = new ServerMessageGenerator(game);
         this.gameRequestHandler = new GameRequestHandler(this, messageGenerator, game);
 
@@ -80,7 +83,7 @@ public class GameController implements Runnable, ServerNetworkObserver, GameObse
         return game;
     }
 
-    public ArrayList<ClientHandler> getClientHandlers() {
+    public List<ClientHandler> getClientHandlers() {
         return clientHandlers;
     }
 
@@ -184,7 +187,7 @@ public class GameController implements Runnable, ServerNetworkObserver, GameObse
         StarterCard starterCard=null;
         for(Player p : game.getPlayers()) {
             try {
-                starterCard = (StarterCard) game.getStarterCardDeck().directDraw() ;
+                starterCard = game.getStarterCardDeck().directDraw();
             } catch (EmptyDeckException ignored) {}
             p.setStarterCard(starterCard);
         }
@@ -197,8 +200,8 @@ public class GameController implements Runnable, ServerNetworkObserver, GameObse
     {
         for (Player p : game.getPlayers()) {
             try {
-                ObjectiveCard cardTemp1 = ((ObjectiveCard) game.getObjectiveCardDeck().directDraw());
-                ObjectiveCard cardTemp2 = ((ObjectiveCard) game.getObjectiveCardDeck().directDraw());
+                ObjectiveCard cardTemp1 = game.getObjectiveCardDeck().directDraw();
+                ObjectiveCard cardTemp2 = game.getObjectiveCardDeck().directDraw();
                 p.setDrawnObjectiveCards(new ObjectiveCard[]{cardTemp1, cardTemp2});
             } catch (EmptyDeckException ignored) {
             }
@@ -220,6 +223,7 @@ public class GameController implements Runnable, ServerNetworkObserver, GameObse
     public synchronized void ready(ClientHandler player){
         getCurrentPlayer(player).setReady(true);
         if(echo) System.out.println("In game '" + gameName + "' player '" + player.getUsername() + "' is ready");
+        notifyReady();
     }
 
     /**
@@ -262,9 +266,41 @@ public class GameController implements Runnable, ServerNetworkObserver, GameObse
         } catch (CardNotInHandException e) {
             throw new CannotPlaceCardException("The card is not in your hand");
         }
+        notifyLastRound();
         broadcast(messageGenerator.updatedScoresMessage(this));
         if(echo) System.out.println("In game '" + gameName + "' player '" + client.getUsername() + "' placed the card " + placeableCardId + " at X:" + x + " Y:" + y);
         if(game.getGameState() == GameState.lastRound) passTurn(client);
+    }
+
+    /**
+     * Checks that the client is allowed to draw right now: it must be their turn and
+     * they must have already placed a card this turn.
+     * @param client The ClientHandler representing the player who wants to draw a card.
+     * @throws NotYourTurnException Thrown if it's not the player's turn.
+     * @throws CannotDrawException Thrown if the player hasn't placed a card yet this turn.
+     */
+    private void checkCanDraw(ClientHandler client) throws NotYourTurnException, CannotDrawException {
+        if (isNotTheTurnOf(client)) {
+            throw new NotYourTurnException();
+        }
+        if (!getCurrentPlayer(client).hasAlreadyPlaced()) {
+            throw new CannotDrawException();
+        }
+    }
+
+    /**
+     * Adds an already-drawn card to the player's hand and advances the game: logs the draw,
+     * checks for the last round condition and passes the turn to the next player.
+     * @param client The ClientHandler representing the player who drew the card.
+     * @param drawnCard The card that was drawn.
+     * @param logDescription Description of the draw used for the echo log, e.g. "a gold card from the deck".
+     * @throws FullHandException Thrown if the player's hand is already full.
+     */
+    private void addDrawnCardAndAdvance(ClientHandler client, PlaceableCard drawnCard, String logDescription) throws FullHandException {
+        getCurrentPlayer(client).addToHand(drawnCard);
+        if(echo) System.out.println("In game '" + gameName + "' player '" + client.getUsername() + "' has drawn " + logDescription);
+        notifyLastRound();
+        passTurn(client);
     }
 
     /**
@@ -276,18 +312,8 @@ public class GameController implements Runnable, ServerNetworkObserver, GameObse
      * @throws CannotDrawException Thrown if the player hasn't placed a card yet this turn.
      */
     public void directDrawResourceCard (ClientHandler client) throws NotYourTurnException, EmptyDeckException, FullHandException, CannotDrawException {
-        if (isNotTheTurnOf(client)) {
-            throw new NotYourTurnException();
-        }
-        if (!getCurrentPlayer(client).hasAlreadyPlaced()) {
-            throw new CannotDrawException();
-        }
-
-        ResourceCard cardTemp = (ResourceCard) game.getResourceCardDeck().directDraw();
-        getCurrentPlayer(client).addToHand(cardTemp);
-        if(echo) System.out.println("In game '" + gameName + "' player '" + client.getUsername() + "' has drawn a resource card from the deck");
-        notifyLastRound();
-        passTurn(client);
+        checkCanDraw(client);
+        addDrawnCardAndAdvance(client, game.getResourceCardDeck().directDraw(), "a resource card from the deck");
     }
 
     /**
@@ -298,18 +324,8 @@ public class GameController implements Runnable, ServerNetworkObserver, GameObse
      * @throws CannotDrawException Thrown if the player hasn't placed a card yet this turn.
      */
     public void directDrawGoldCard (ClientHandler client) throws EmptyDeckException, FullHandException, NotYourTurnException, CannotDrawException {
-        if (isNotTheTurnOf(client)) {
-            throw new NotYourTurnException();
-        }
-        if (!getCurrentPlayer(client).hasAlreadyPlaced()) {
-            throw new CannotDrawException();
-        }
-
-        GoldCard cardTemp = (GoldCard) game.getGoldCardDeck().directDraw();
-        getCurrentPlayer(client).addToHand(cardTemp);
-        if(echo) System.out.println("In game '" + gameName + "' player '" + client.getUsername() + "' has drawn a gold card from the deck");
-        notifyLastRound();
-        passTurn(client);
+        checkCanDraw(client);
+        addDrawnCardAndAdvance(client, game.getGoldCardDeck().directDraw(), "a gold card from the deck");
     }
 
     /**
@@ -320,18 +336,8 @@ public class GameController implements Runnable, ServerNetworkObserver, GameObse
      * @throws CannotDrawException Thrown if the player hasn't placed a card yet this turn.
      */
     public void drawLeftRevealedResourceCard (ClientHandler client) throws FullHandException, NotYourTurnException, CannotDrawException {
-        if (isNotTheTurnOf(client)) {
-            throw new NotYourTurnException();
-        }
-        if (!getCurrentPlayer(client).hasAlreadyPlaced()) {
-            throw new CannotDrawException();
-        }
-
-        ResourceCard cardTemp = (ResourceCard) game.getResourceCardDeck().drawLeftRevealedCard();
-        getCurrentPlayer(client).addToHand(cardTemp);
-        if(echo) System.out.println("In game '" + gameName + "' player '" + client.getUsername() + "' has drawn the left revealed resource card");
-        notifyLastRound();
-        passTurn(client);
+        checkCanDraw(client);
+        addDrawnCardAndAdvance(client, game.getResourceCardDeck().drawLeftRevealedCard(), "the left revealed resource card");
     }
 
     /**
@@ -342,18 +348,8 @@ public class GameController implements Runnable, ServerNetworkObserver, GameObse
      * @throws CannotDrawException Thrown if the player hasn't placed a card yet this turn.
      */
     public void drawRightRevealedResourceCard (ClientHandler client) throws FullHandException, NotYourTurnException, CannotDrawException {
-        if (isNotTheTurnOf(client)) {
-            throw new NotYourTurnException();
-        }
-        if (!getCurrentPlayer(client).hasAlreadyPlaced()) {
-            throw new CannotDrawException();
-        }
-
-        ResourceCard cardTemp = (ResourceCard) game.getResourceCardDeck().drawRightRevealedCard();
-        getCurrentPlayer(client).addToHand(cardTemp);
-        if(echo) System.out.println("In game '" + gameName + "' player '" + client.getUsername() + "' has drawn the right revealed resource card");
-        notifyLastRound();
-        passTurn(client);
+        checkCanDraw(client);
+        addDrawnCardAndAdvance(client, game.getResourceCardDeck().drawRightRevealedCard(), "the right revealed resource card");
     }
 
     /**
@@ -364,18 +360,8 @@ public class GameController implements Runnable, ServerNetworkObserver, GameObse
      * @throws CannotDrawException Thrown if the player hasn't placed a card yet this turn.
      */
     public void drawLeftRevealedGoldCard (ClientHandler client) throws FullHandException, NotYourTurnException, CannotDrawException {
-        if (isNotTheTurnOf(client)) {
-            throw new NotYourTurnException();
-        }
-        if (!getCurrentPlayer(client).hasAlreadyPlaced()) {
-            throw new CannotDrawException();
-        }
-
-        GoldCard cardTemp = (GoldCard) game.getGoldCardDeck().drawLeftRevealedCard();
-        getCurrentPlayer(client).addToHand(cardTemp);
-        if(echo) System.out.println("In game '" + gameName + "' player '" + client.getUsername() + "' has drawn the left revealed gold card");
-        notifyLastRound();
-        passTurn(client);
+        checkCanDraw(client);
+        addDrawnCardAndAdvance(client, game.getGoldCardDeck().drawLeftRevealedCard(), "the left revealed gold card");
     }
 
     /**
@@ -386,18 +372,8 @@ public class GameController implements Runnable, ServerNetworkObserver, GameObse
      * @throws CannotDrawException Thrown if the player hasn't placed a card yet this turn.
      */
     public void drawRightRevealedGoldCard (ClientHandler client) throws FullHandException, NotYourTurnException, CannotDrawException {
-        if (isNotTheTurnOf(client)) {
-            throw new NotYourTurnException();
-        }
-        if (!getCurrentPlayer(client).hasAlreadyPlaced()) {
-            throw new CannotDrawException();
-        }
-
-        GoldCard cardTemp = (GoldCard) game.getGoldCardDeck().drawRightRevealedCard();
-        getCurrentPlayer(client).addToHand(cardTemp);
-        if(echo) System.out.println("In game '" + gameName + "' player '" + client.getUsername() + "' has drawn the right revealed gold card");
-        notifyLastRound();
-        passTurn(client);
+        checkCanDraw(client);
+        addDrawnCardAndAdvance(client, game.getGoldCardDeck().drawRightRevealedCard(), "the right revealed gold card");
     }
 
     /**
@@ -418,6 +394,7 @@ public class GameController implements Runnable, ServerNetworkObserver, GameObse
                 System.out.println("In game '"+ gameName + "' player '" + client.getUsername() + "' chose to play their starter card on the " + side);
             }
             currentPlayer.setStarterCardOrientationSelected(true);
+            notifyStarterCardAndSecretObjectiveSelected();
             return true;
         }
         return false;
@@ -434,6 +411,7 @@ public class GameController implements Runnable, ServerNetworkObserver, GameObse
         for(ObjectiveCard drawnObjectiveCard : currentPlayer.getDrawnObjectiveCards())
             if (drawnObjectiveCard.getId() == objectiveCardId) {
                 currentPlayer.setSecretObjective(drawnObjectiveCard);
+                notifyStarterCardAndSecretObjectiveSelected();
                 if (echo) {
                     System.out.println("In game '"+ gameName + "' player '" + client.getUsername() + "' chose to the secret objective " + objectiveCardId);
                 }

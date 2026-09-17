@@ -5,7 +5,9 @@ import it.polimi.ingsw.server.model.card.StarterCard;
 import it.polimi.ingsw.util.customexceptions.CannotPlaceCardException;
 import it.polimi.ingsw.util.supportclasses.Resource;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.Map;
 
 /**
  * This class represents a player's game field, which is the grid where they place their cards during the game.
@@ -14,26 +16,22 @@ import java.util.HashMap;
 public class GameField {
     private final HashMap<String, PlaceableCard> cardsGrid;
     private final Player player;
-    private int fungiCount;
-    private int animalCount;
-    private int plantCount;
-    private int insectCount;
-    private int scrollCount;
-    private int inkPotCount;
-    private int featherCount;
-    private final ArrayList<PlaceableCard> plantCards;
-    private final ArrayList<PlaceableCard> animalCards;
-    private final ArrayList<PlaceableCard> fungiCards;
-    private final ArrayList<PlaceableCard> insectCards;
+    private final Map<Resource, Integer> resourceCounts;
+    private final Map<Resource, ArrayList<PlaceableCard>> cardsByKingdom;
     private final ArrayList<PlaceableCard> placementHistory;
 
     public GameField(Player player) {
         this.player = player;
         cardsGrid = new HashMap<>();
-        animalCards = new ArrayList<>();
-        insectCards = new ArrayList<>();
-        fungiCards = new ArrayList<>();
-        plantCards = new ArrayList<>();
+        resourceCounts = new EnumMap<>(Resource.class);
+        for (Resource resource : Resource.values()) {
+            resourceCounts.put(resource, 0);
+        }
+        cardsByKingdom = new EnumMap<>(Resource.class);
+        cardsByKingdom.put(Resource.animal, new ArrayList<>());
+        cardsByKingdom.put(Resource.insect, new ArrayList<>());
+        cardsByKingdom.put(Resource.fungi, new ArrayList<>());
+        cardsByKingdom.put(Resource.plant, new ArrayList<>());
         placementHistory = new ArrayList<>();
     }
 
@@ -43,23 +41,23 @@ public class GameField {
     }
 
     public int getFungiCount() {
-        return fungiCount;
+        return resourceCounts.get(Resource.fungi);
     }
 
     public ArrayList<PlaceableCard> getPlantCards() {
-        return plantCards;
+        return cardsByKingdom.get(Resource.plant);
     }
 
     public ArrayList<PlaceableCard> getAnimalCards() {
-        return animalCards;
+        return cardsByKingdom.get(Resource.animal);
     }
 
     public ArrayList<PlaceableCard> getFungiCards() {
-        return fungiCards;
+        return cardsByKingdom.get(Resource.fungi);
     }
 
     public ArrayList<PlaceableCard> getInsectCards() {
-        return insectCards;
+        return cardsByKingdom.get(Resource.insect);
     }
 
     public ArrayList<PlaceableCard> getPlacementHistory() {
@@ -71,27 +69,27 @@ public class GameField {
     }
 
     public int getAnimalCount() {
-        return animalCount;
+        return resourceCounts.get(Resource.animal);
     }
 
     public int getPlantCount() {
-        return plantCount;
+        return resourceCounts.get(Resource.plant);
     }
 
     public int getInsectCount() {
-        return insectCount;
+        return resourceCounts.get(Resource.insect);
     }
 
     public int getScrollCount() {
-        return scrollCount;
+        return resourceCounts.get(Resource.scroll);
     }
 
     public int getInkPotCount() {
-        return inkPotCount;
+        return resourceCounts.get(Resource.inkPot);
     }
 
     public int getFeatherCount() {
-        return featherCount;
+        return resourceCounts.get(Resource.feather);
     }
 
     /**
@@ -242,10 +240,10 @@ public class GameField {
     private boolean followsPlacementRequirements (PlaceableCard placeableCard){
 
         if(!placeableCard.isFacingUp()) return true;
-        return placeableCard.getRequiredAnimalResourceAmount() <= this.animalCount &&
-                placeableCard.getRequiredFungiResourceAmount() <= this.fungiCount &&
-                placeableCard.getRequiredInsectResourceAmount() <= this.insectCount &&
-                placeableCard.getRequiredPlantResourceAmount() <= this.plantCount;
+        return placeableCard.getRequiredAnimalResourceAmount() <= getAnimalCount() &&
+                placeableCard.getRequiredFungiResourceAmount() <= getFungiCount() &&
+                placeableCard.getRequiredInsectResourceAmount() <= getInsectCount() &&
+                placeableCard.getRequiredPlantResourceAmount() <= getPlantCount();
 
     }
 
@@ -300,13 +298,8 @@ public class GameField {
         else{
             this.addResource(card.getCardKingdom());
         }
-        switch (card.getCardKingdom())
-        {
-            case fungi -> this.fungiCards.add(card);
-            case animal -> this.animalCards.add(card);
-            case plant -> this.plantCards.add(card);
-            case insect -> this.insectCards.add(card);
-        }
+        ArrayList<PlaceableCard> kingdomCards = cardsByKingdom.get(card.getCardKingdom());
+        if (kingdomCards != null) kingdomCards.add(card);
     }
 
     /**
@@ -314,18 +307,7 @@ public class GameField {
      * @param resource The resource to add to the total visible amount.
      */
     private void addResource(Resource resource){
-
-        switch (resource){
-            case fungi -> fungiCount++;
-            case animal -> animalCount++;
-            case plant -> plantCount++;
-            case insect -> insectCount++;
-            case scroll -> scrollCount++;
-            case inkPot -> inkPotCount++;
-            case feather -> featherCount++;
-            default -> {}
-        }
-
+        resourceCounts.merge(resource, 1, Integer::sum);
     }
 
     /**
@@ -333,18 +315,7 @@ public class GameField {
      * @param resource The resource to add to the total visible amount.
      */
     private void removeResource(Resource resource){
-
-        switch (resource){
-            case fungi -> fungiCount--;
-            case animal -> animalCount--;
-            case plant -> plantCount--;
-            case insect -> insectCount--;
-            case scroll -> scrollCount--;
-            case inkPot -> inkPotCount--;
-            case feather -> featherCount--;
-            default -> {}
-        }
-
+        resourceCounts.merge(resource, -1, Integer::sum);
     }
 
 }

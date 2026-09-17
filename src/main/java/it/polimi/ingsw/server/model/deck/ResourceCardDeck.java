@@ -8,7 +8,7 @@ import java.util.Collections;
 /**
  * This class represents the resource card deck.
  */
-public class ResourceCardDeck extends DeckWithRevealedCards {
+public class ResourceCardDeck extends DeckWithRevealedCards<ResourceCard> {
     public ResourceCardDeck() {
         cards = new ArrayList<>();
         for (int i=1; i<41; i++) {

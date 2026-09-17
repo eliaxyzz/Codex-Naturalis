@@ -6,10 +6,11 @@ import it.polimi.ingsw.util.customexceptions.EmptyDeckException;
 /**
  * This abstract class represents a deck of cards that can have
  * two cards revealed on the table.
+ * @param <T> The type of card held by the deck.
  */
-public abstract class DeckWithRevealedCards extends Deck{
-    protected Card leftRevealedCard;
-    protected Card rightRevealedCard;
+public abstract class DeckWithRevealedCards<T extends Card> extends Deck<T>{
+    protected T leftRevealedCard;
+    protected T rightRevealedCard;
 
     public int getLeftRevealedCardID() {
         if (leftRevealedCard == null) { return 0;}
@@ -25,8 +26,8 @@ public abstract class DeckWithRevealedCards extends Deck{
      * Draws the left revealed card from the board and replaces it with the top card of the deck.
      * @return The drawn card.
      */
-    public Card drawLeftRevealedCard() {
-        Card selectedCard;
+    public T drawLeftRevealedCard() {
+        T selectedCard;
         selectedCard = leftRevealedCard;
         try {
             leftRevealedCard = this.directDraw();
@@ -40,8 +41,8 @@ public abstract class DeckWithRevealedCards extends Deck{
      * Draws the right revealed card from the board and replaces it with the top card of the deck.
      * @return The drawn card.
      */
-    public Card drawRightRevealedCard() {
-        Card selectedCard;
+    public T drawRightRevealedCard() {
+        T selectedCard;
         selectedCard = rightRevealedCard;
         try {
             rightRevealedCard = this.directDraw();

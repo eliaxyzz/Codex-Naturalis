@@ -7,7 +7,7 @@ import java.util.Collections;
 /**
  * This class represents the starter card deck.
  */
-public class StarterCardDeck extends Deck {
+public class StarterCardDeck extends Deck<StarterCard> {
     public StarterCardDeck() {
         cards = new ArrayList<>();
         for (int i=81; i<87; i++) {

@@ -5,7 +5,6 @@ import it.polimi.ingsw.network.ClientConnectionManager;
 import it.polimi.ingsw.network.ClientNetworkObserver;
 import it.polimi.ingsw.util.customexceptions.ServerUnreachableException;
 import it.polimi.ingsw.util.supportclasses.ClientState;
-import javafx.application.Platform;
 import org.json.simple.JSONObject;
 
 /**
@@ -26,14 +25,13 @@ public class ClientController implements ClientNetworkObserver {
      * Singleton pattern implementation to ensure only one instance of
      * `ClientController` exists throughout the application.
      * @return The singleton instance.
+     * @throws IllegalStateException if the client hasn't connected to a server yet via
+     * {@link #getInstance(String, int)}. There's no sane server to fall back to here,
+     * so failing loudly beats silently talking to the wrong one.
      */
     public static ClientController getInstance() {
         if (instance == null) {
-            try {
-                instance = new ClientController("localhost", 12345); //should not happen !
-            } catch (ServerUnreachableException e) {
-                throw new RuntimeException(e);
-            }
+            throw new IllegalStateException("ClientController requested before a connection was established. Call getInstance(serverAddress, serverPort) first.");
         }
         return instance;
     }
@@ -200,19 +198,10 @@ public class ClientController implements ClientNetworkObserver {
     }
 
     /**
-     * Shuts down the client application gracefully when the client is running the GUI.
+     * Closes the connection to the server. Does not terminate the JVM: the
+     * caller (GUI or CLI) decides when and how to exit the process.
      */
-    public void shutdownForGUI() {
+    public void shutdown() {
         clientConnectionManager.shutdown();
-        Platform.exit();
-        System.exit(0);
-    }
-
-    /**
-     * Shuts down the client application gracefully when the client is running the CLI.
-     */
-    public void shutdownForCLI() {
-        clientConnectionManager.shutdown();
-        System.exit(0);
     }
 }
