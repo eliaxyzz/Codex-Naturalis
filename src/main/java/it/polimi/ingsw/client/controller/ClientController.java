@@ -5,7 +5,6 @@ import it.polimi.ingsw.network.ClientConnectionManager;
 import it.polimi.ingsw.network.ClientNetworkObserver;
 import it.polimi.ingsw.util.customexceptions.ServerUnreachableException;
 import it.polimi.ingsw.util.supportclasses.ClientState;
-import javafx.application.Platform;
 import org.json.simple.JSONObject;
 
 /**
@@ -200,19 +199,10 @@ public class ClientController implements ClientNetworkObserver {
     }
 
     /**
-     * Shuts down the client application gracefully when the client is running the GUI.
+     * Closes the connection to the server. Does not terminate the JVM: the
+     * caller (GUI or CLI) decides when and how to exit the process.
      */
-    public void shutdownForGUI() {
+    public void shutdown() {
         clientConnectionManager.shutdown();
-        Platform.exit();
-        System.exit(0);
-    }
-
-    /**
-     * Shuts down the client application gracefully when the client is running the CLI.
-     */
-    public void shutdownForCLI() {
-        clientConnectionManager.shutdown();
-        System.exit(0);
     }
 }

@@ -81,10 +81,11 @@ public class ClientCLI {
     }
 
     /**
-     * Shuts down the client.
+     * Shuts down the client and terminates the process.
      */
     public void shutdown() {
         clientTerminalInputReader.shutdown();
-        ClientController.getInstance().shutdownForCLI();
+        ClientController.getInstance().shutdown();
+        System.exit(0);
     }
 }

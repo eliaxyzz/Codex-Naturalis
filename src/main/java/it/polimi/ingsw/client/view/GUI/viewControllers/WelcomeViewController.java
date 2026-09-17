@@ -3,6 +3,7 @@ package it.polimi.ingsw.client.view.GUI.viewControllers;
 import it.polimi.ingsw.client.controller.ClientController;
 import it.polimi.ingsw.client.model.ClientStateModel;
 import it.polimi.ingsw.client.model.PlayerModel;
+import it.polimi.ingsw.client.view.GUI.ClientGUI;
 import it.polimi.ingsw.client.view.StageManager;
 import it.polimi.ingsw.client.view.ViewController;
 import it.polimi.ingsw.util.supportclasses.ClientState;
@@ -127,8 +128,8 @@ public class WelcomeViewController extends ViewController {
     @FXML
     private void exit(){
         ClientController.getInstance().sendLeaveMessage();
-        ClientController.getInstance().shutdownForGUI();
         StageManager.getCurrentStage().close();
+        ClientGUI.exit();
     }
 
     /**

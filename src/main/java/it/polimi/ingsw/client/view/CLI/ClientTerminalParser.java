@@ -29,7 +29,7 @@ public class ClientTerminalParser implements CommandParser {
             case "help","h","?" -> Printer.printHelp();
             case "setusername","su" -> updateUsername(tokens);
             case "leave", "l" -> leave();
-            case "quit", "q" -> ClientController.getInstance().shutdownForCLI();
+            case "quit", "q" -> ClientCLI.getInstance().shutdown();
             case "create", "c" -> createGame(tokens);
             case "availablegames", "ag" -> getAvailableGames();
             case "info" -> getInfo(tokens);

@@ -4,7 +4,11 @@ import it.polimi.ingsw.server.model.Game;
 import it.polimi.ingsw.util.customexceptions.*;
 import it.polimi.ingsw.util.supportclasses.GameState;
 import it.polimi.ingsw.util.supportclasses.Request;
+import it.polimi.ingsw.util.supportclasses.RequestCommand;
+import it.polimi.ingsw.util.supportclasses.RequestFields;
 import org.json.simple.JSONObject;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * This class handles incoming requests from clients related to the game and delegates them to the appropriate methods in the game controller.
@@ -13,10 +17,24 @@ public class GameRequestHandler {
     private final GameController gameController;
     private final ServerMessageGenerator messageGenerator;
     private final Game game;
+    private final Map<String, RequestCommand> commands = new HashMap<>();
+
     public GameRequestHandler(GameController gameController, ServerMessageGenerator messageGenerator, Game game) {
         this.messageGenerator = messageGenerator;
         this.gameController = gameController;
         this.game = game;
+        commands.put("ready", (client, message) -> ready(client));
+        commands.put("starterCard", (client, message) -> chooseStarterCardOrientation(message, client));
+        commands.put("objectiveCard", (client, message) -> chooseSecretObjectiveCard(message, client));
+        commands.put("directDrawResourceCard", (client, message) -> directDrawResourceCard(client));
+        commands.put("directDrawGoldCard", (client, message) -> directDrawGoldCard(client));
+        commands.put("drawLeftResourceCard", (client, message) -> drawLeftRevealedResourceCard(client));
+        commands.put("drawRightResourceCard", (client, message) -> drawRightRevealedResourceCard(client));
+        commands.put("drawLeftGoldCard", (client, message) -> drawLeftRevealedGoldCard(client));
+        commands.put("drawRightGoldCard", (client, message) -> drawRightRevealedGoldCard(client));
+        commands.put("place", this::place);
+        commands.put("leave", (client, message) -> leave(client));
+        commands.put("connectionLost", (client, message) -> gameController.handleConnectionLoss(client));
     }
 
     /**
@@ -24,37 +42,37 @@ public class GameRequestHandler {
      * @param request that is about to be executed
      */
     public void execute (Request request)  {
+        JSONObject message = request.message();
+        ClientHandler client = request.client();
+        String command;
+        try {
+            command = RequestFields.getCommand(message);
+        } catch (InvalidMessageException e) {
+            System.out.println("Discarding malformed request from client: " + e.getMessage());
+            return;
+        }
+
         if(game.getGameState() == GameState.lastRound) {
-            if(request.message().get("command").equals("directDrawResourceCard") ||
-                request.message().get("command").equals("directDrawGoldCard") ||
-                request.message().get("command").equals("drawLeftResourceCard") ||
-                request.message().get("command").equals("drawRightResourceCard") ||
-                request.message().get("command").equals("drawLeftGoldCard") ||
-                request.message().get("command").equals("drawRightGoldCard")) {
+            if(command.equals("directDrawResourceCard") ||
+                command.equals("directDrawGoldCard") ||
+                command.equals("drawLeftResourceCard") ||
+                command.equals("drawRightResourceCard") ||
+                command.equals("drawLeftGoldCard") ||
+                command.equals("drawRightGoldCard")) {
                 return;
             }
         }
         if(game.getGameState() == GameState.endGame || game.getGameState() == GameState.aClientDisconnected) {
-            if(!request.message().get("command").equals("leave") && !request.message().get("command").equals("connectionLost")) {
+            if(!command.equals("leave") && !command.equals("connectionLost")) {
                 return;
             }
         }
-        JSONObject message = request.message();
-        ClientHandler client = request.client();
-        switch (message.get("command").toString()) {
-            case "ready" -> ready(client);
-            case "starterCard" -> chooseStarterCardOrientation(message, client);
-            case "objectiveCard" -> chooseSecretObjectiveCard(message,client);
-            case "directDrawResourceCard" -> directDrawResourceCard(client);
-            case "directDrawGoldCard" -> directDrawGoldCard(client);
-            case "drawLeftResourceCard" -> drawLeftRevealedResourceCard(client);
-            case "drawRightResourceCard" -> drawRightRevealedResourceCard(client);
-            case "drawLeftGoldCard" -> drawLeftRevealedGoldCard(client);
-            case "drawRightGoldCard" -> drawRightRevealedGoldCard(client);
-            case "place" -> place(client, message);
-            case "leave" -> leave(client);
-            case "connectionLost" -> gameController.handleConnectionLoss(client);
-            default -> { /*do nothing */}
+        RequestCommand handler = commands.get(command);
+        if (handler == null) return; //unrecognized command, discarded
+        try {
+            handler.execute(client, message);
+        } catch (InvalidMessageException e) {
+            System.out.println("Discarding malformed '" + command + "' request from client: " + e.getMessage());
         }
     }
 
@@ -73,8 +91,8 @@ public class GameRequestHandler {
      * @param client client handler representing the player who sent the request
      */
     private void chooseStarterCardOrientation(JSONObject message, ClientHandler client) {
-        int starterCardId =Integer.parseInt(message.get("starterCardId").toString());
-        boolean facingUp= Boolean.parseBoolean(message.get("facingUp").toString());
+        int starterCardId = RequestFields.getInt(message, "starterCardId");
+        boolean facingUp = RequestFields.getBoolean(message, "facingUp");
         if (!gameController.chooseStarterCardSide(client, starterCardId, facingUp)) {
             client.send(messageGenerator.invalidSelectionMessage("That's not your starter card"));
         }
@@ -86,7 +104,7 @@ public class GameRequestHandler {
      * @param client client handler representing the player who sent the request
      */
     private void chooseSecretObjectiveCard(JSONObject message, ClientHandler client) {
-        int objectiveCardId =Integer.parseInt(message.get("objectiveCardId").toString());
+        int objectiveCardId = RequestFields.getInt(message, "objectiveCardId");
         if (!gameController.chooseSecretObjectiveCard(client, objectiveCardId)) {
             client.send(messageGenerator.invalidSelectionMessage("That's not one of your drawn objective cards"));
         }
@@ -211,10 +229,10 @@ public class GameRequestHandler {
      */
     private void place(ClientHandler client, JSONObject message) {
         try {
-            int placeableCardId = Integer.parseInt(message.get("placeableCardId").toString());
-            int x = Integer.parseInt(message.get("x").toString());
-            int y = Integer.parseInt(message.get("y").toString());
-            boolean facingUp = Boolean.parseBoolean(message.get("facingUp").toString());
+            int placeableCardId = RequestFields.getInt(message, "placeableCardId");
+            int x = RequestFields.getInt(message, "x");
+            int y = RequestFields.getInt(message, "y");
+            boolean facingUp = RequestFields.getBoolean(message, "facingUp");
             gameController.place(client, placeableCardId, facingUp, x, y);
             client.send(messageGenerator.successfulPlaceMessage(gameController.getCurrentPlayer(client)));
         }
