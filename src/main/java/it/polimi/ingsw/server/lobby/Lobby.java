@@ -7,16 +7,19 @@ import it.polimi.ingsw.server.controller.GameController;
 import it.polimi.ingsw.server.view.ServerView;
 import it.polimi.ingsw.util.customexceptions.*;
 import it.polimi.ingsw.util.supportclasses.Request;
+import org.json.simple.JSONObject;
 import java.util.*;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
 
 /**
  * This class represents the lobby where players can create or join a game and set their usernames
  */
 public class Lobby implements ServerNetworkObserver {
 
-    private final List<Request> requests;
+    private final BlockingQueue<Request> requests;
     private final ArrayList<ClientHandler> connectedClients;
     private final HashMap<String, GameController> games;
     private final HashMap<String, GameController> availableGames;
@@ -34,7 +37,7 @@ public class Lobby implements ServerNetworkObserver {
         games = new HashMap<>();
         availableGames = new HashMap<>();
         takenUsernames = new ArrayList<>();
-        requests = Collections.synchronizedList(new ArrayList<>());
+        requests = new LinkedBlockingQueue<>();
         executorService = Executors.newCachedThreadPool();
         lobbyRequestHandler = new LobbyRequestHandler(this);
         ServerView.getInstance(this);
@@ -106,9 +109,10 @@ public class Lobby implements ServerNetworkObserver {
         System.out.println("Type 'help' for more information.");
         System.out.println();
         while (running) {
-            while (!requests.isEmpty()) {
-                lobbyRequestHandler.execute(requests.getFirst());
-                requests.removeFirst();
+            try {
+                lobbyRequestHandler.execute(requests.take());
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
             }
         }
     }
@@ -118,7 +122,6 @@ public class Lobby implements ServerNetworkObserver {
      * @param client New client handler.
      */
     public void submitNewClient(ClientHandler client) {
-        executorService.submit(client);
         enterLobby(client);
         setRandomGuestUsername(client);
         client.send(LobbyMessageGenerator.usernameSetMessage(client.getUsername()));
@@ -144,8 +147,8 @@ public class Lobby implements ServerNetworkObserver {
      * Submits a new request to lobby.
      * @param request The new request.
      */
-    public synchronized void submitNewRequest(Request request) {
-        requests.addLast(request);
+    public void submitNewRequest(Request request) {
+        requests.add(request);
     }
 
     /**
@@ -253,7 +256,9 @@ public class Lobby implements ServerNetworkObserver {
         if (echo) {
             System.out.println("Client '" + clientHandler.getUsername() + "' lost connection");
         }
-        leaveLobby(clientHandler);
+        JSONObject message = new JSONObject();
+        message.put("command", "connectionLost");
+        submitNewRequest(new Request(clientHandler, message));
     }
 
     /**

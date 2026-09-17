@@ -35,7 +35,7 @@ public class GameRequestHandler {
             }
         }
         if(game.getGameState() == GameState.endGame || game.getGameState() == GameState.aClientDisconnected) {
-            if(!request.message().get("command").equals("leave")) {
+            if(!request.message().get("command").equals("leave") && !request.message().get("command").equals("connectionLost")) {
                 return;
             }
         }
@@ -53,6 +53,7 @@ public class GameRequestHandler {
             case "drawRightGoldCard" -> drawRightRevealedGoldCard(client);
             case "place" -> place(client, message);
             case "leave" -> leave(client);
+            case "connectionLost" -> gameController.handleConnectionLoss(client);
             default -> { /*do nothing */}
         }
     }

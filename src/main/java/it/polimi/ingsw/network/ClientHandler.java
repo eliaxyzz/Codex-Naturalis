@@ -16,14 +16,13 @@ import java.util.Map;
 /**
  * This class offers network functionalities for the server between the server and the client.
  */
-public class ClientHandler implements Runnable, NetworkInterface {
+public class ClientHandler implements NetworkInterface {
     private final PrintWriter out;
     private final Socket socket;
     private final NetworkInputHandler networkInputHandler;
     private final Thread inputHandlerThread;
     private final Pinger pinger;
     private final Thread pingerThread;
-    private volatile boolean running;
 
     private String username;
     private GameController game = null;
@@ -48,7 +47,6 @@ public class ClientHandler implements Runnable, NetworkInterface {
         pingerThread.start();
 
         isInGame = false;
-        running = true;
     }
 
     public InetAddress getInetAddress() {
@@ -77,13 +75,6 @@ public class ClientHandler implements Runnable, NetworkInterface {
 
     public boolean isInGame() {
         return isInGame;
-    }
-
-    @Override
-    public void run() {
-        while (running) {
-            Thread.onSpinWait();
-        }
     }
 
     @Override
@@ -150,6 +141,5 @@ public class ClientHandler implements Runnable, NetworkInterface {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        running = false;
     }
 }

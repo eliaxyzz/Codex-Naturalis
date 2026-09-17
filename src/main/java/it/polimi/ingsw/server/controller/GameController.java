@@ -13,6 +13,8 @@ import org.json.simple.JSONObject;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import static it.polimi.ingsw.util.supportclasses.Constants.SCORE_GOAL;
 
 /**
@@ -24,7 +26,7 @@ public class GameController implements Runnable, ServerNetworkObserver, GameObse
     private final ArrayList<ClientHandler> clientHandlers;
     private final Lobby lobby;
     private final Game game;
-    private final List<Request> requests;
+    private final BlockingQueue<Request> requests;
     private boolean echo;
     private boolean running;
     private final GameRequestHandler gameRequestHandler;
@@ -34,7 +36,7 @@ public class GameController implements Runnable, ServerNetworkObserver, GameObse
         this.gameName = gameName;
         this.clientHandlers = new ArrayList<>();
         this.lobby = lobby;
-        this.requests = Collections.synchronizedList(new ArrayList<>());
+        this.requests = new LinkedBlockingQueue<>();
         this.echo = echo;
         running = true;
         this.game = new Game(numberOfPlayers,this);
@@ -49,9 +51,10 @@ public class GameController implements Runnable, ServerNetworkObserver, GameObse
     @Override
     public void run() {
         while (running) {
-            while (!requests.isEmpty()) {
-                gameRequestHandler.execute(requests.getFirst());
-                requests.removeFirst();
+            try {
+                gameRequestHandler.execute(requests.take());
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
             }
         }
     }
@@ -70,7 +73,7 @@ public class GameController implements Runnable, ServerNetworkObserver, GameObse
 
     @Override
     public void submitNewRequest(Request request) {
-        requests.addLast(request);
+        requests.add(request);
     }
 
     public Game getGame() {
@@ -459,6 +462,17 @@ public class GameController implements Runnable, ServerNetworkObserver, GameObse
         if (echo) {
             System.out.println("In game '" + gameName + "' player '" + client.getUsername() + "' disconnected");
         }
+        JSONObject message = new JSONObject();
+        message.put("command", "connectionLost");
+        submitNewRequest(new Request(client, message));
+    }
+
+    /**
+     * Runs the disconnection cleanup on the game's single request-processing thread,
+     * so it never races with a command being handled for another player.
+     * @param client The client that lost connection.
+     */
+    void handleConnectionLoss(ClientHandler client) {
         leaveGame(client);
         lobby.notifyConnectionLoss(client);
         if(!(game.getGameState() == GameState.endGame || game.getGameState() == GameState.waitingForPlayers)) {
