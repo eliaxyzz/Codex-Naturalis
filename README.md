@@ -42,6 +42,28 @@ Each client can interact with the server by using a GUI or a CLI.
 The GUI has been realised by using Javafx.
 For more information and screenshots please check the view documentation.
 
+### Threads and who owns what
+
+The server is built around a few single-threaded owners that talk through queues, so game state never needs locks:
+
+- **Accept thread** (`ServerWelcomeSocket`): wraps each new socket in a `ClientHandler` and hands it to the lobby.
+- **Lobby thread** (`Lobby`): owns usernames, the connected-client list and game creation. Requests, new connections and disconnects all arrive as tasks on its queue.
+- **One thread per game** (`GameController`, run on the lobby's executor): owns its `Game`. Joins, player requests and disconnects are queued to it; nothing else writes the game's state.
+- **Two threads per connection** (`Connection`): a reader that turns lines into messages and a pinger that keeps the link alive. Either one can notice the other side is gone; only the first report counts.
+
+A client is routed to the lobby or to its game by `ClientHandler`'s `game` field (`null` means lobby). Game rules (turns, last round, setup cards, scoring) live in `Game`, `Player` and `GameField`. `GameController` only sequences them and sends the messages.
+
+On the client, `ClientController` receives messages on the network thread and updates the observable models in `client/model`. The GUI and CLI views observe those models, and the GUI moves back onto the JavaFX thread with `Platform.runLater`.
+
+### Building and testing
+
+```
+mvn test       # unit tests plus loopback tests that run a real lobby on a free port
+mvn package    # also builds target/LB08-1.0-SNAPSHOT-jar-with-dependencies.jar
+```
+
+In the server console, `echo on` prints every lobby and game event. Warnings are always printed.
+
 ### Usage
 
 The precompiled jar can be used to run this application.
