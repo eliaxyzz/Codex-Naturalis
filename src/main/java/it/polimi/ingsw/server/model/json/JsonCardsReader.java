@@ -3,8 +3,12 @@ package it.polimi.ingsw.server.model.json;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import it.polimi.ingsw.server.model.card.*;
 import it.polimi.ingsw.server.model.card.GoldCardStrategy.*;
 import it.polimi.ingsw.util.customexceptions.CannotOpenJSONException;
@@ -20,6 +24,57 @@ import org.json.simple.parser.ParseException;
  * about card properties based on the JSON structure.
  */
 public class JsonCardsReader {
+    public static final String RESOURCE_CARDS = "JsonResourceCards.json";
+    public static final String GOLD_CARDS = "JsonGoldCards.json";
+    public static final String STARTER_CARDS = "JsonStarterCards.json";
+
+    //every new game builds ~90 cards, so each file is parsed once and kept by card id.
+    //The parsed objects are only ever read after this point.
+    private static final Map<String, Map<Integer, JSONObject>> cardsByFile = new ConcurrentHashMap<>();
+
+    /**
+     * @param file One of RESOURCE_CARDS, GOLD_CARDS, STARTER_CARDS.
+     * @return The ids of every card described in that file, in ascending order.
+     * @throws IllegalStateException If the file can't be read: the game can't run without its cards.
+     */
+    public static List<Integer> cardIds(String file) {
+        try {
+            return cardsIn(file).keySet().stream().sorted().toList();
+        } catch (CannotOpenJSONException e) {
+            throw new IllegalStateException(e.getMessage(), e);
+        }
+    }
+
+    private static JSONObject cardData(String file, int id) throws CannotOpenJSONException, InvalidIdException {
+        JSONObject item = cardsIn(file).get(id);
+        if (item == null) throw new InvalidIdException("invalid id: " + id);
+        return item;
+    }
+
+    private static Map<Integer, JSONObject> cardsIn(String file) throws CannotOpenJSONException {
+        Map<Integer, JSONObject> cards = cardsByFile.get(file);
+        if (cards == null) {
+            cards = parse(file);
+            cardsByFile.putIfAbsent(file, cards);
+        }
+        return cards;
+    }
+
+    private static Map<Integer, JSONObject> parse(String file) throws CannotOpenJSONException {
+        InputStream is = Thread.currentThread().getContextClassLoader().getResourceAsStream(file);
+        if (is == null) throw new CannotOpenJSONException("missing resource " + file);
+        try (InputStreamReader reader = new InputStreamReader(is, StandardCharsets.UTF_8)) {
+            JSONArray dataArray = (JSONArray) ((JSONObject) new JSONParser().parse(reader)).get("data");
+            Map<Integer, JSONObject> cards = new HashMap<>();
+            for (Object obj : dataArray) {
+                JSONObject item = (JSONObject) obj;
+                cards.put(((Long) item.get("Id")).intValue(), item);
+            }
+            return Map.copyOf(cards);
+        } catch (IOException | ParseException e) {
+            throw new CannotOpenJSONException("couldn't load " + file + ": " + e.getMessage());
+        }
+    }
 
     /**
      * Extracts the resource type from a JSONObject representing a corner of a card in the JSON data.
@@ -49,32 +104,10 @@ public class JsonCardsReader {
      * @param id Unique id that identifies the card.
      * @param resourceCard  Reference to the card itself.
      * @throws CannotOpenJSONException If the JSON file cannot be opened or parsed.
-     * @throws InvalidIdException If the provided ID is invalid (outside the range of 1-40).
+     * @throws InvalidIdException If there's no resource card with that id.
      */
     public static void loadResourceCard(int id, ResourceCard resourceCard) throws CannotOpenJSONException, InvalidIdException {
-        if (id < 1 || id > 40) {
-            throw new InvalidIdException("invalid id: "+ id);
-        }
-        ClassLoader classloader = Thread.currentThread().getContextClassLoader();
-        InputStream is = classloader.getResourceAsStream("JsonResourceCards.json");
-        assert is != null;
-        InputStreamReader isr = new InputStreamReader(is);
-        try {
-            JSONParser jsonParser = new JSONParser();
-            JSONObject jsonObject = (JSONObject) jsonParser.parse(isr);
-            JSONArray dataArray = (JSONArray) jsonObject.get("data");
-            for (Object obj : dataArray) {
-                JSONObject item = (JSONObject) obj;
-                if (id == ((Long) item.get("Id")).intValue()) {
-                    loadGenericPlaceableCardInformation(resourceCard, item, id);
-                    break;
-                }
-            }
-        } catch (IOException e) {
-            throw new CannotOpenJSONException("couldn't load JsonResourceCards file");
-        } catch (ParseException e) {
-            throw new CannotOpenJSONException("couldn't load resource card " + id);
-        }
+        loadGenericPlaceableCardInformation(resourceCard, cardData(RESOURCE_CARDS, id), id);
     }
 
     /**
@@ -82,36 +115,13 @@ public class JsonCardsReader {
      * @param id Unique id that identifies the card.
      * @param goldCard  Reference to the card itself.
      * @throws CannotOpenJSONException If the JSON file cannot be opened or parsed.
-     * @throws InvalidIdException If the provided ID is invalid (outside the range of 41-80).
+     * @throws InvalidIdException If there's no gold card with that id.
      */
     public static void loadGoldCard(int id, GoldCard goldCard) throws CannotOpenJSONException, InvalidIdException {
-        if (id < 41 || id > 80) {
-            throw new InvalidIdException("invalid id: "+ id);
-        }
-        ClassLoader classloader = Thread.currentThread().getContextClassLoader();
-        InputStream is = classloader.getResourceAsStream("JsonGoldCards.json");
-        assert is != null;
-        InputStreamReader isr = new InputStreamReader(is);
-        try {
-            JSONParser jsonParser = new JSONParser();
-            JSONObject jsonObject = (JSONObject) jsonParser.parse(isr);
-            JSONArray dataArray = (JSONArray) jsonObject.get("data");
-            for (Object obj : dataArray) {
-                JSONObject item = (JSONObject) obj;
-                JSONArray requirements = (JSONArray) item.get("Requirements");
-                if (id == ((Long) item.get("Id")).intValue()) {
-                    loadGenericPlaceableCardInformation(goldCard, item, id);
-                    loadGoldCardStrategy(goldCard, item);
-                    loadGoldCardRequirements(goldCard, requirements);
-                    break;
-                }
-            }
-
-        } catch (IOException e) {
-            throw new CannotOpenJSONException("couldn't load JsonGoldCards file");
-        } catch (ParseException e) {
-            throw new CannotOpenJSONException("couldn't load gold card " + id);
-        }
+        JSONObject item = cardData(GOLD_CARDS, id);
+        loadGenericPlaceableCardInformation(goldCard, item, id);
+        loadGoldCardStrategy(goldCard, item);
+        loadGoldCardRequirements(goldCard, (JSONArray) item.get("Requirements"));
     }
 
     /**
@@ -170,38 +180,15 @@ public class JsonCardsReader {
         }
     }
 
-
     /**
      * Loads starter card information from a JSON file based on the provided card ID.
      * @param id Unique id that identifies the card.
      * @param starterCard  Reference to the card itself.
      * @throws CannotOpenJSONException If the JSON file cannot be opened or parsed.
-     * @throws InvalidIdException If the provided ID is invalid (outside the range of 81-86).
+     * @throws InvalidIdException If there's no starter card with that id.
      */
     public static void loadStarterCard(int id, StarterCard starterCard) throws CannotOpenJSONException, InvalidIdException {
-        if (id < 81 || id > 86) {
-            throw new InvalidIdException("invalid id: "+ id);
-        }
-        ClassLoader classloader = Thread.currentThread().getContextClassLoader();
-        InputStream is = classloader.getResourceAsStream("JsonStarterCards.json");
-        assert is != null;
-        InputStreamReader isr = new InputStreamReader(is);
-        try {
-            JSONParser jsonParser = new JSONParser();
-            JSONObject jsonObject = (JSONObject) jsonParser.parse(isr);
-            JSONArray dataArray = (JSONArray) jsonObject.get("data");
-            for (Object obj : dataArray) {
-                JSONObject item = (JSONObject) obj;
-                if (id == ((Long) item.get("Id")).intValue()) {
-                    loadStarterCardResourcesAndCorners(starterCard, item, id);
-                    break;
-                }
-            }
-        } catch (IOException e) {
-            throw new CannotOpenJSONException("couldn't load JsonStarterCards file");
-        } catch (ParseException e) {
-            throw new CannotOpenJSONException("couldn't load starter card " + id);
-        }
+        loadStarterCardResourcesAndCorners(starterCard, cardData(STARTER_CARDS, id), id);
     }
 
     /**
@@ -228,7 +215,4 @@ public class JsonCardsReader {
         starterCard.setBackBottomLeftCorner(new Corner(getCornerResource(item, "BackBottomLeftCorner"), getCornerAttachable(item, "BackBottomLeftCorner"), starterCard));
         starterCard.setBackBottomRightCorner(new Corner(getCornerResource(item, "BackBottomRightCorner"), getCornerAttachable(item, "BackBottomRightCorner"), starterCard));
     }
-
 }
-
-
