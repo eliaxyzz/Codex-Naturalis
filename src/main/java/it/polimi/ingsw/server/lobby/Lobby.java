@@ -113,8 +113,8 @@ public class Lobby implements ServerNetworkObserver {
      */
     public void submitNewClient(ClientHandler client) {
         tasks.add(() -> {
-            enterLobby(client);
             setRandomGuestUsername(client);
+            enterLobby(client);
             client.send(LobbyMessageGenerator.usernameSetMessage(client.getUsername()));
             //only now can messages or a disconnect come in, and the client already has a name
             client.start();

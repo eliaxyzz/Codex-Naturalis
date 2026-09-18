@@ -54,7 +54,8 @@ public class NetworkInputHandler implements Runnable {
         try {
             parsed = parser.parse(line);
         } catch (ParseException e) {
-            System.out.println("Discarding malformed message: " + e.getMessage());
+            //json-simple's ParseException has no message, its toString() is the useful part
+            System.out.println("Discarding malformed message (" + e + "): " + line);
             return;
         }
         if (parsed instanceof JSONObject message) {

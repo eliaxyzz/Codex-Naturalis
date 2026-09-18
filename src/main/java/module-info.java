@@ -1,10 +1,8 @@
-@SuppressWarnings("all")
 module LB08 {
     requires javafx.controls;
     requires javafx.fxml;
     requires javafx.graphics;
     requires json.simple;
-    requires junit;
     requires org.controlsfx.controls;
     requires java.desktop;
     requires java.logging;
