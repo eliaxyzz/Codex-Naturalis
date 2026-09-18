@@ -17,7 +17,6 @@ import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.LinkedBlockingQueue;
-import static it.polimi.ingsw.util.supportclasses.Constants.SCORE_GOAL;
 
 /**
  * This class manages the logic of a game instance. It acts as the central controller
@@ -26,7 +25,7 @@ import static it.polimi.ingsw.util.supportclasses.Constants.SCORE_GOAL;
  * disconnects all arrive as tasks on {@code tasks}. clientHandlers is still a CopyOnWriteArrayList
  * because the lobby and the server console read it (player counts, game info) from their threads.
  */
-public class GameController implements Runnable, ServerNetworkObserver, GameObserver {
+public class GameController implements Runnable, ServerNetworkObserver {
     private final String gameName;
     private final List<ClientHandler> clientHandlers;
     private final Lobby lobby;
@@ -177,34 +176,27 @@ public class GameController implements Runnable, ServerNetworkObserver, GameObse
 
     }
 
-    /**
-     * Compares the game's turn counter with the index of the client handler in the clientHandlers list.
-     * @param client The ClientHandler representing the player.
-     * @return true if it's not the player's turn, false otherwise.
-     */
     private boolean isNotTheTurnOf(ClientHandler client) {
-        return game.getTurnCounter() != clientHandlers.indexOf(client);
+        return !game.isTurnOf(client.getUsername());
     }
 
     /**
-     * Increments the game's turn counter, resets the current player's turn state,
-     * broadcasts a turn update message to all players, and checks for the end game condition.
+     * Ends the current player's turn, tells everyone whose turn it is and, if that closed
+     * the last round, sends the final leaderboard.
      * @param client The ClientHandler representing the current player.
      */
     private void passTurn (ClientHandler client) {
-        if(game.getTurnCounter() == game.getNumberOfPlayers() -1) game.setTurnCounter(0);
-        else game.setTurnCounter(game.getTurnCounter() + 1);
         getCurrentPlayer(client).clearTurnState();
+        boolean gameOver = game.passTurn();
         broadcast(messageGenerator.turnPlayerUpdateMessage(this));
-        notifyEndGame();
+        if (gameOver) {
+            if(echo) System.out.println("Game '" + gameName + "' has ended");
+            calculateFinalScore();
+        }
     }
 
-    /**
-     * Retrieves the ClientHandler object at the index of the game's turn counter from the clientHandlers list.
-     * @return The username of the player whose turn it is
-     */
     public String getTurnPlayerUsername() {
-        return clientHandlers.get(game.getTurnCounter()).getUsername();
+        return game.getTurnPlayer();
     }
 
     /**
@@ -256,9 +248,10 @@ public class GameController implements Runnable, ServerNetworkObserver, GameObse
     /**
      * Communicates to the players the game is about to start and sends their cards.
      */
-    public void startGame () {
-        //shuffles the client handlers to decide the round player sequence randomly
+    private void startGame () {
+        //random turn order; clientHandlers follows it too so score lists come out in turn order
         Collections.shuffle(clientHandlers);
+        game.startPlaying(clientHandlers.stream().map(ClientHandler::getUsername).toList());
         //initializes the hand of each player
         for(Player p : game.getPlayers()) {
             p.initializeHand();
@@ -269,7 +262,6 @@ public class GameController implements Runnable, ServerNetworkObserver, GameObse
             getCurrentPlayer(client).clearTurnState();
         }
         broadcast(messageGenerator.updatedScoresMessage(this));
-        game.setTurnCounter(0);
         if(echo) {
             System.out.println("Game '" + gameName + "' is starting");
         }
@@ -461,8 +453,7 @@ public class GameController implements Runnable, ServerNetworkObserver, GameObse
         }
     }
 
-    @Override
-    public void notifyConnectedClientCountChanged() {
+    private void notifyConnectedClientCountChanged() {
         if(clientHandlers.isEmpty()) {
             if (echo) {
                 System.out.println("There are no more players in the game '" + gameName + "': game is closed");
@@ -493,8 +484,7 @@ public class GameController implements Runnable, ServerNetworkObserver, GameObse
         return game.getPlayersHashMap().size() == game.getNumberOfPlayers();
     }
 
-    @Override
-    public void notifyReady() {
+    private void notifyReady() {
         if(!gameIsFull()) return;
         if(game.getGameState()!=GameState.waitingForPlayers) return;
 
@@ -523,67 +513,37 @@ public class GameController implements Runnable, ServerNetworkObserver, GameObse
         }
     }
 
-    @Override
-    public void notifyStarterCardAndSecretObjectiveSelected() {
+    private void notifyStarterCardAndSecretObjectiveSelected() {
         if(game.getGameState() != GameState.waitingForCardsSelection) return;
         for (ClientHandler player : clientHandlers) {
             Player currentPlayer = getCurrentPlayer(player);
             if(!currentPlayer.isStarterCardOrientationSelected() || currentPlayer.getSecretObjective() == null) return;
         }
-        game.setGameState(GameState.playing);
         if(echo) {
             System.out.println("In game '" + gameName + "' all players selected the starter card side and secret objective");
         }
         startGame();
     }
 
-    @Override
-    public void notifyLastRound() {
-        if(game.getGameState() != GameState.playing) return;
-        String reason;
-        for (ClientHandler clientHandler : clientHandlers) {
-            if (getCurrentPlayer(clientHandler).getScore() >= SCORE_GOAL) {
-                game.setGameState(GameState.lastRound);
-                reason = "player " + clientHandler.getUsername() + " has 20 or more points";
-                broadcast(messageGenerator.lastRoundMessage(reason));
-                if(echo) {
-                    System.out.println("Game '" + gameName + "' is at the last round because " + reason);
-                }
-                return;
-            }
+    private void notifyLastRound() {
+        String reason = game.startLastRoundIfDue();
+        if (reason == null) return;
+        broadcast(messageGenerator.lastRoundMessage(reason));
+        if(echo) {
+            System.out.println("Game '" + gameName + "' is at the last round because " + reason);
         }
-        
-        if (game.getGoldCardDeck().isEmpty() && game.getResourceCardDeck().isEmpty()) {
-            game.setGameState(GameState.lastRound);
-            reason = "decks are empty";
-            broadcast(messageGenerator.lastRoundMessage(reason));
-            if(echo) {
-                System.out.println("Game '" + gameName + "' is at the last round because " + reason);
-            }
-        }
-
-    }
-
-    @Override
-    public void notifyEndGame() {
-        if(game.getGameState()==GameState.endGame) return;
-        if(game.getGameState()!=GameState.lastRound) return;
-        if(game.getTurnCounter() != 0) return;
-        game.setGameState(GameState.endGame);
-        if(echo) System.out.println("Game '" + gameName + "' has ended");
-        calculateFinalScore();
     }
 
     /**
      * Calculates the final leaderboard and sends it to each client.
      */
-    public void calculateFinalScore() {
+    private void calculateFinalScore() {
         ArrayList<ClientHandler> classifiedPlayers = new ArrayList<>();
         for (ClientHandler c : clientHandlers) {
             classifiedPlayers.add(c);
             getCurrentPlayer(c).calculateFinalScore();
         }
-        sortPlayers(classifiedPlayers);
+        classifiedPlayers.sort((c1, c2) -> getCurrentPlayer(c1).compareTo(getCurrentPlayer(c2)));
         broadcast(messageGenerator.leaderBoardMessage(this , classifiedPlayers));
         if(echo) {
             System.out.println("Game '" + gameName + "' leaderboard:");
@@ -591,10 +551,6 @@ public class GameController implements Runnable, ServerNetworkObserver, GameObse
                 System.out.println(i + ": " + classifiedPlayers.get(i).getUsername() + " " + getCurrentPlayer(classifiedPlayers.get(i)).getScore() + " points (" + getCurrentPlayer(classifiedPlayers.get(i)).getNumOfCompletedObjectiveCards() + " objectives completed)");
             }
         }
-    }
-
-    private void sortPlayers(ArrayList<ClientHandler> clients) {
-        clients.sort((c1, c2) -> getCurrentPlayer(c1).compareTo(getCurrentPlayer(c2)));
     }
 
 }
