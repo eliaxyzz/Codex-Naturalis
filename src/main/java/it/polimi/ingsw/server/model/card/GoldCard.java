@@ -1,7 +1,7 @@
 package it.polimi.ingsw.server.model.card;
 
 import it.polimi.ingsw.server.model.GameField;
-import it.polimi.ingsw.server.model.card.GoldCardStrategy.GoldCardContext;
+import it.polimi.ingsw.server.model.card.GoldCardStrategy.ConditionStrategy;
 import it.polimi.ingsw.server.model.json.JsonCardsReader;
 import it.polimi.ingsw.util.customexceptions.CannotOpenJSONException;
 import it.polimi.ingsw.util.customexceptions.InvalidIdException;
@@ -10,7 +10,7 @@ import it.polimi.ingsw.util.customexceptions.InvalidIdException;
  * This class represents a Gold card.
  */
 public class GoldCard extends PlaceableCard {
-    protected GoldCardContext context;
+    protected ConditionStrategy strategy;
 
     public GoldCard() {
         // for testing purpose only
@@ -31,14 +31,14 @@ public class GoldCard extends PlaceableCard {
      * @return Points earned by placing the card.
      */
     public int placementPoints(GameField gameField) {
-        return context.executePointsCalculation(this.getPoints(),gameField,this);
+        return strategy.calculatePoints(this.getPoints(), gameField, this);
     }
 
-    public GoldCardContext getContext() {
-        return context;
+    public ConditionStrategy getStrategy() {
+        return strategy;
     }
 
-    public void setContext(GoldCardContext context) {
-        this.context = context;
+    public void setStrategy(ConditionStrategy strategy) {
+        this.strategy = strategy;
     }
 }

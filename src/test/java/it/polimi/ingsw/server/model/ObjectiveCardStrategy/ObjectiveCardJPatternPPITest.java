@@ -30,7 +30,7 @@ class ObjectiveCardJPatternPPITest {
     @BeforeEach
     void setUp() {
         player = new Player(game);
-        gameField = new GameField(player);
+        gameField = new GameField();
         gameField.place(new StarterCard(81),true);
     }
     @AfterEach

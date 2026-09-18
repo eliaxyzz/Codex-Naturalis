@@ -3,15 +3,15 @@ package it.polimi.ingsw.server.model.card.ObjectiveCardStrategy;
 import it.polimi.ingsw.server.model.GameField;
 
 /**
- * This interface contains the method that is going to be implemented for each single strategy
- * owned by every single objective card.
+ * How an objective card is scored. Implementations only count, they never touch the player:
+ * the caller decides what a completion is worth and keeps the tally.
  */
+@FunctionalInterface
 public interface ObjectiveStrategy {
+
     /**
-     * Performs the calculation of the points received by fulfilling the objective.
-     * @param pointsOnTheCard Points given by the objective card.
-     * @param gamefield Reference to the game-field that is being analysed.
-     * @return The amount of calculated points on the specific game-field.
+     * @param gameField The game field to look at.
+     * @return How many times the objective is met on it, each card counted at most once.
      */
-    int calculatePoints(int pointsOnTheCard, GameField gamefield);
+    int timesCompleted(GameField gameField);
 }

@@ -153,11 +153,12 @@ public class JsonCardsReader {
     private static void loadGoldCardStrategy(GoldCard goldCard, JSONObject item)  {
         String strategy = item.get("Strategy").toString();
         switch (strategy) {
-            case "coveredcorner" -> goldCard.setContext(new GoldCardContext(new GoldCardCoveredCornerStrategy()));
-            case "noaction" -> goldCard.setContext(new GoldCardContext(new GoldCardNoActionStrategy()));
-            case "feather" -> goldCard.setContext(new GoldCardContext(new GoldCardFeatherStrategy()));
-            case "scroll" -> goldCard.setContext(new GoldCardContext(new GoldCardScrollStrategy()));
-            case "inkpot" -> goldCard.setContext(new GoldCardContext(new GoldCardInkPotStrategy()));
+            case "coveredcorner" -> goldCard.setStrategy(new GoldCardCoveredCornerStrategy());
+            case "noaction" -> goldCard.setStrategy(new GoldCardNoActionStrategy());
+            case "feather" -> goldCard.setStrategy(new GoldCardFeatherStrategy());
+            case "scroll" -> goldCard.setStrategy(new GoldCardScrollStrategy());
+            case "inkpot" -> goldCard.setStrategy(new GoldCardInkPotStrategy());
+            default -> throw new IllegalStateException("unknown gold card strategy: " + strategy);
         }
     }
 

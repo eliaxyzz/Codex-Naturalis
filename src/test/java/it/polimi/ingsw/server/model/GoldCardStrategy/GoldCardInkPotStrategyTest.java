@@ -19,6 +19,7 @@ class GoldCardInkPotStrategyTest {
     private static Game game;
     private GameField gameField;
     private Player player;
+    private int score;
 
     @BeforeAll
     static void setUpBeforeClass() {
@@ -29,7 +30,8 @@ class GoldCardInkPotStrategyTest {
     @BeforeEach
     void setUp() {
         player = new Player(game);
-        gameField = new GameField(player);
+        gameField = new GameField();
+        score = 0;
         gameField.place(new StarterCard(82),true);
     }
     @AfterEach
@@ -47,26 +49,26 @@ class GoldCardInkPotStrategyTest {
     void calculatePointsCase1() {
         //carta gold piazzabile e unico punto dato da Inkpot che possiede la gold stessa
         try {
-            gameField.place(new ResourceCard(34), true, 1, 1);
-            gameField.place(new GoldCard(73), true,1, -1);
+            score += gameField.place(new ResourceCard(34), true, 1, 1);
+            score += gameField.place(new GoldCard(73), true,1, -1);
         } catch (CannotPlaceCardException e) {
             throw new RuntimeException(e);
         }
 
-        assertEquals(1,gameField.getPlayer().getScore());
+        assertEquals(1,score);
     }
 
     @Test
     void calculatePointsCase2() {
         //carta gold piazzabile e unico punto dato da Inkpot che possiede la gold stessa
         try {
-            gameField.place(new ResourceCard(34), true, 1, 1);
-            gameField.place(new ResourceCard(25), true, 2, 2);
-            gameField.place(new GoldCard(73), true,1, -1);
+            score += gameField.place(new ResourceCard(34), true, 1, 1);
+            score += gameField.place(new ResourceCard(25), true, 2, 2);
+            score += gameField.place(new GoldCard(73), true,1, -1);
         } catch (CannotPlaceCardException e) {
             throw new RuntimeException(e);
         }
 
-        assertEquals(2,gameField.getPlayer().getScore());
+        assertEquals(2,score);
     }
 }

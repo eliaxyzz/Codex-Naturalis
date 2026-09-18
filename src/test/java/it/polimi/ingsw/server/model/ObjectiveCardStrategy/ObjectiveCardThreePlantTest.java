@@ -30,7 +30,7 @@ class ObjectiveCardThreePlantTest {
     @BeforeEach
     void setUp() {
         player = new Player(game);
-        gameField = new GameField(player);
+        gameField = new GameField();
     }
     @AfterEach
     void tearDown() {

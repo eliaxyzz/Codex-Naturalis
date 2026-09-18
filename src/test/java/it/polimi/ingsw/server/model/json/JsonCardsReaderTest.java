@@ -1,6 +1,5 @@
 package it.polimi.ingsw.server.model.json;
 
-import it.polimi.ingsw.server.model.card.GoldCardStrategy.GoldCardContext;
 import it.polimi.ingsw.server.model.card.GoldCardStrategy.GoldCardFeatherStrategy;
 import it.polimi.ingsw.server.model.card.Corner;
 import it.polimi.ingsw.server.model.card.GoldCard;
@@ -75,7 +74,7 @@ class JsonCardsReaderTest {
         referenceGoldCard.setFrontTopLeftCorner(new Corner(Resource.none,false,referenceGoldCard));
         referenceGoldCard.setFrontTopRightCorner(new Corner(Resource.none,true,referenceGoldCard));
         referenceGoldCard.setFacingUp(true);
-        referenceGoldCard.setContext(new GoldCardContext(new GoldCardFeatherStrategy()));
+        referenceGoldCard.setStrategy(new GoldCardFeatherStrategy());
         GoldCard testCard = new GoldCard();
         try {
             JsonCardsReader.loadGoldCard(41,testCard);
@@ -87,7 +86,7 @@ class JsonCardsReaderTest {
             System.err.println(e.getMessage());
         }
         assertSameCard(referenceGoldCard, testCard);
-        assertEquals(referenceGoldCard.getContext(), testCard.getContext());
+        assertEquals(referenceGoldCard.getStrategy().getClass(), testCard.getStrategy().getClass());
     }
 
     @Test

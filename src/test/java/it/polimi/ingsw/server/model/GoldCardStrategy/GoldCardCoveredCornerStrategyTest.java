@@ -18,6 +18,7 @@ class GoldCardCoveredCornerStrategyTest {
     private static Game game;
     private GameField gameField;
     private Player player;
+    private int score;
 
     @BeforeAll
     static void setUpBeforeClass() {
@@ -28,7 +29,8 @@ class GoldCardCoveredCornerStrategyTest {
     @BeforeEach
     void setUp() {
         player = new Player(game);
-        gameField = new GameField(player);
+        gameField = new GameField();
+        score = 0;
         gameField.place(new StarterCard(82),true);
     }
     @AfterEach
@@ -45,24 +47,24 @@ class GoldCardCoveredCornerStrategyTest {
     @Test
     void calculatePoints1() {
         try {
-            gameField.place(new ResourceCard(4), true, -1,1);
-            gameField.place(new GoldCard(44), true,1, -1);
+            score += gameField.place(new ResourceCard(4), true, -1,1);
+            score += gameField.place(new GoldCard(44), true,1, -1);
         } catch (CannotPlaceCardException e) {
             throw new RuntimeException(e);
         }
 
-        assertEquals(2,gameField.getPlayer().getScore());
+        assertEquals(2,score);
     }
     @Test
     void calculatePoints2() {
         try {
-            gameField.place(new ResourceCard(4), true, -1,1);
-            gameField.place(new ResourceCard(5), false, 1,-1);
-            gameField.place(new ResourceCard(6), false, 2,0);
-            gameField.place(new GoldCard(44), true,1, 1);
+            score += gameField.place(new ResourceCard(4), true, -1,1);
+            score += gameField.place(new ResourceCard(5), false, 1,-1);
+            score += gameField.place(new ResourceCard(6), false, 2,0);
+            score += gameField.place(new GoldCard(44), true,1, 1);
         } catch (CannotPlaceCardException e) {
             throw new RuntimeException(e);
         }
-        assertEquals(4,gameField.getPlayer().getScore());
+        assertEquals(4,score);
     }
 }

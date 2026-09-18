@@ -25,7 +25,7 @@ class PlayerTest {
     void setUp() {
         referencePlayer = new Player(game);
         referencePlayer.getHand().clear();
-        gameField = new GameField(referencePlayer);
+        gameField = new GameField();
 
     }
     @AfterEach

@@ -7,6 +7,7 @@ import it.polimi.ingsw.util.supportclasses.Resource;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -15,13 +16,11 @@ import java.util.Map;
  */
 public class GameField {
     private final HashMap<String, PlaceableCard> cardsGrid;
-    private final Player player;
     private final Map<Resource, Integer> resourceCounts;
-    private final Map<Resource, ArrayList<PlaceableCard>> cardsByKingdom;
+    private final Map<Resource, List<PlaceableCard>> cardsByKingdom;
     private final ArrayList<PlaceableCard> placementHistory;
 
-    public GameField(Player player) {
-        this.player = player;
+    public GameField() {
         cardsGrid = new HashMap<>();
         resourceCounts = new EnumMap<>(Resource.class);
         for (Resource resource : Resource.values()) {
@@ -36,28 +35,19 @@ public class GameField {
     }
 
     //GETTERS and SETTERS
-    public Player getPlayer() {
-        return player;
+    public int getResourceCount(Resource resource) {
+        return resourceCounts.get(resource);
+    }
+
+    /**
+     * @return The placed cards of the given kingdom (only animal, fungi, insect and plant have any).
+     */
+    public List<PlaceableCard> getCardsOfKingdom(Resource kingdom) {
+        return cardsByKingdom.getOrDefault(kingdom, List.of());
     }
 
     public int getFungiCount() {
         return resourceCounts.get(Resource.fungi);
-    }
-
-    public ArrayList<PlaceableCard> getPlantCards() {
-        return cardsByKingdom.get(Resource.plant);
-    }
-
-    public ArrayList<PlaceableCard> getAnimalCards() {
-        return cardsByKingdom.get(Resource.animal);
-    }
-
-    public ArrayList<PlaceableCard> getFungiCards() {
-        return cardsByKingdom.get(Resource.fungi);
-    }
-
-    public ArrayList<PlaceableCard> getInsectCards() {
-        return cardsByKingdom.get(Resource.insect);
     }
 
     public ArrayList<PlaceableCard> getPlacementHistory() {
@@ -151,8 +141,9 @@ public class GameField {
      * @param facingUp Value that chooses the side of the card that will be shown. True ro place it on the front side, false otherwise.
      * @param x The x coordinate.
      * @param y The y coordinate.
+     * @return The points the placement is worth.
      */
-    public void place(PlaceableCard card, boolean facingUp, int x, int y) throws CannotPlaceCardException {
+    public int place(PlaceableCard card, boolean facingUp, int x, int y) throws CannotPlaceCardException {
         if (this.lookAtCoordinates(x,y)!=null) throw new CannotPlaceCardException("There's already a card placed there!");
         if (!this.followsPlacementRules(x,y)) throw new CannotPlaceCardException("You can't place a card there!");
         if (!this.followsPlacementRequirements(card, facingUp)) throw new CannotPlaceCardException("You don't have enough resources to place this card!");
@@ -162,8 +153,8 @@ public class GameField {
         card.setX(x);
         card.setY(y);
         updateNeighboursAndResources(card, x,y); //updates the surrounding cards and resource state
-        if(card.isFacingUp()) player.setScore(player.getScore()+card.placementPoints(this)); //gets the points earned from placing the card
         addToPlacementHistory(card);
+        return card.isFacingUp() ? card.placementPoints(this) : 0;
     }
 
     /**
@@ -300,7 +291,7 @@ public class GameField {
         else{
             this.addResource(card.getCardKingdom());
         }
-        ArrayList<PlaceableCard> kingdomCards = cardsByKingdom.get(card.getCardKingdom());
+        List<PlaceableCard> kingdomCards = cardsByKingdom.get(card.getCardKingdom());
         if (kingdomCards != null) kingdomCards.add(card);
     }
 

@@ -10,8 +10,8 @@ import java.util.Collections;
 public class ObjectiveCardDeck extends Deck<ObjectiveCard> {
     public ObjectiveCardDeck() {
         cards = new ArrayList<>();
-        for (int i = 87; i < 103; i++) {
-            cards.add(new ObjectiveCard(i));
+        for (int id : ObjectiveCard.ids()) {
+            cards.add(new ObjectiveCard(id));
         }
         Collections.shuffle(cards);
     }

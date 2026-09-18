@@ -29,7 +29,7 @@ class ObjectiveCardThreeAnimalTest {
     @BeforeEach
     void setUp() {
         player = new Player(game);
-        gameField = new GameField(player);
+        gameField = new GameField();
         gameField.place(new StarterCard(82),true);
     }
     @AfterEach

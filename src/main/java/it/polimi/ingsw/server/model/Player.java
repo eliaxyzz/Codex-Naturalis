@@ -4,6 +4,7 @@ import it.polimi.ingsw.server.model.card.*;
 import it.polimi.ingsw.util.customexceptions.*;
 import it.polimi.ingsw.util.supportclasses.Token;
 import java.util.ArrayList;
+import java.util.List;
 import static it.polimi.ingsw.util.supportclasses.Constants.MAX_HAND_SIZE;
 
 /**
@@ -30,7 +31,7 @@ public class Player {
         this.game = game;
         this.token = game.getRandomToken();
         this.score = 0;
-        this.gamefield = new GameField(this);
+        this.gamefield = new GameField();
         this.hand = new ArrayList<>();
         this.starterCard = null;
         this.secretObjective = null;
@@ -194,25 +195,22 @@ public class Player {
             }
         }
         if(cardInHand == null) throw new CardNotInHandException();
-        gamefield.place(cardInHand,facingUp,x,y);
+        increaseScore(gamefield.place(cardInHand,facingUp,x,y));
         removeFromHand(cardInHand);
         alreadyPlaced = true;
     }
 
     /**
-     * calculates the points given by the secrete objective card and the 2 common objective
+     * Adds the points of the secret objective and of the 2 common ones, and counts how many
+     * objectives were completed (the tie-breaker).
      */
     public void calculateFinalScore() {
-        increaseScore(secretObjective.getEarnedPoints(getGamefield()));
-        increaseScore(game.getCommonObjectives().get(0).getEarnedPoints(getGamefield()));
-        increaseScore(game.getCommonObjectives().get(1).getEarnedPoints(getGamefield()));
-    }
-
-    /**
-     * increases the number of completed objective cards
-     */
-    public void increaseNumOfCompletedObjective () {
-        this.numOfCompletedObjectiveCards ++;
+        List<ObjectiveCard> objectives = List.of(secretObjective, game.getCommonObjectives().get(0), game.getCommonObjectives().get(1));
+        for (ObjectiveCard objective : objectives) {
+            int completed = objective.timesCompleted(gamefield);
+            numOfCompletedObjectiveCards += completed;
+            increaseScore(completed * objective.getPoints());
+        }
     }
 
     /**
