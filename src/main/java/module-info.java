@@ -7,6 +7,7 @@ module LB08 {
     requires junit;
     requires org.controlsfx.controls;
     requires java.desktop;
+    requires java.logging;
 
     exports it.polimi.ingsw;
     exports it.polimi.ingsw.server.lobby;

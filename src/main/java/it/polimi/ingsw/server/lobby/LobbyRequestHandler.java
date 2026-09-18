@@ -1,5 +1,7 @@
 package it.polimi.ingsw.server.lobby;
 
+import it.polimi.ingsw.server.ServerLog;
+import java.util.logging.Logger;
 import it.polimi.ingsw.network.ClientHandler;
 import it.polimi.ingsw.util.customexceptions.AlreadyTakenUsernameException;
 import it.polimi.ingsw.util.customexceptions.CannotCreateGameException;
@@ -16,6 +18,7 @@ import java.util.Map;
  * This class represents the request parser of the exchanged messages.
  */
 public class LobbyRequestHandler {
+    private static final Logger LOG = ServerLog.get();
     private final Lobby lobby;
     private final Map<String, RequestCommand> commands = new HashMap<>();
 
@@ -38,7 +41,7 @@ public class LobbyRequestHandler {
         try {
             command = RequestFields.getCommand(message);
         } catch (InvalidMessageException e) {
-            System.out.println("Discarding malformed request from client: " + e.getMessage());
+            LOG.warning("Discarding malformed request from client: " + e.getMessage());
             return;
         }
         RequestCommand handler = commands.get(command);
@@ -46,7 +49,7 @@ public class LobbyRequestHandler {
         try {
             handler.execute(clientHandler, message);
         } catch (InvalidMessageException e) {
-            System.out.println("Discarding malformed '" + command + "' request from client: " + e.getMessage());
+            LOG.warning("Discarding malformed '" + command + "' request from client: " + e.getMessage());
         }
     }
 

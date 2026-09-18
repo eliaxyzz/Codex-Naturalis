@@ -1,5 +1,6 @@
 package it.polimi.ingsw.server.view;
 
+import it.polimi.ingsw.server.ServerLog;
 import it.polimi.ingsw.network.ClientHandler;
 import it.polimi.ingsw.server.controller.GameController;
 import it.polimi.ingsw.server.lobby.Lobby;
@@ -64,12 +65,11 @@ public class ServerView {
      * @param echo If set to true it enables the echo functionality. When set to false it disables the functionality.
      */
     public void setEcho(boolean echo) {
+        ServerLog.setEcho(echo);
         if(echo) {
-            lobby.echoOn();
             System.out.println("Echo enabled");
         }
         else {
-            lobby.echoOff();
             System.out.println("Echo disabled");
             System.out.println();
         }

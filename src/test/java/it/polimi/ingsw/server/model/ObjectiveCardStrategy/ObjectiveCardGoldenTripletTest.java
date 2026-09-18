@@ -22,7 +22,7 @@ class ObjectiveCardGoldenTripletTest {
 
     @BeforeAll
     static void setUpBeforeClass() {
-        controller = new GameController(null,4,"test", false);
+        controller = new GameController(null,4,"test");
         game = controller.getGame();
         objectiveCard = new ObjectiveCard(99);
     }

@@ -1,4 +1,6 @@
 package it.polimi.ingsw.server.controller;
+import it.polimi.ingsw.server.ServerLog;
+import java.util.logging.Logger;
 import it.polimi.ingsw.network.ClientHandler;
 import it.polimi.ingsw.server.model.DrawSource;
 import it.polimi.ingsw.server.model.Game;
@@ -15,6 +17,7 @@ import java.util.Map;
  * This class handles incoming requests from clients related to the game and delegates them to the appropriate methods in the game controller.
  */
 public class GameRequestHandler {
+    private static final Logger LOG = ServerLog.get();
     private final GameController gameController;
     private final ServerMessageGenerator messageGenerator;
     private final Game game;
@@ -52,7 +55,7 @@ public class GameRequestHandler {
         try {
             command = RequestFields.getCommand(message);
         } catch (InvalidMessageException e) {
-            System.out.println("Discarding malformed request from client: " + e.getMessage());
+            LOG.warning("Discarding malformed request from client: " + e.getMessage());
             return;
         }
 
@@ -67,7 +70,7 @@ public class GameRequestHandler {
         try {
             handler.execute(client, message);
         } catch (InvalidMessageException e) {
-            System.out.println("Discarding malformed '" + command + "' request from client: " + e.getMessage());
+            LOG.warning("Discarding malformed '" + command + "' request from client: " + e.getMessage());
         }
     }
 

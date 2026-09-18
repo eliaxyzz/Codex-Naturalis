@@ -1,5 +1,8 @@
 package it.polimi.ingsw.server.lobby;
 
+import it.polimi.ingsw.server.ServerLog;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import it.polimi.ingsw.network.ClientHandler;
 import it.polimi.ingsw.network.ServerWelcomeSocket;
 import it.polimi.ingsw.network.ServerNetworkObserver;
@@ -24,6 +27,7 @@ import static it.polimi.ingsw.util.supportclasses.Constants.MIN_PLAYERS;
  * the server console touch them from their own threads.
  */
 public class Lobby implements ServerNetworkObserver {
+    private static final Logger LOG = ServerLog.get();
 
     private final BlockingQueue<Runnable> tasks;
     private final List<ClientHandler> connectedClients;
@@ -35,7 +39,6 @@ public class Lobby implements ServerNetworkObserver {
     private int welcomeSocketPort;
     private final ExecutorService executorService;
     private final LobbyRequestHandler lobbyRequestHandler;
-    private boolean echo;
     private volatile boolean running;
 
     public Lobby() {
@@ -46,7 +49,6 @@ public class Lobby implements ServerNetworkObserver {
         tasks = new LinkedBlockingQueue<>();
         executorService = Executors.newCachedThreadPool();
         lobbyRequestHandler = new LobbyRequestHandler(this);
-        echo = false;
         running = true;
 
     }
@@ -84,27 +86,6 @@ public class Lobby implements ServerNetworkObserver {
     }
 
     /**
-     * Disables the echo function of the server.
-     */
-    public void echoOff() {
-        echo = false;
-        for(GameController gameController : games.values()) {
-            gameController.echoOff();
-        }
-        System.out.println();
-    }
-
-    /**
-     * Enables the echo function of the server.
-     */
-    public void echoOn() {
-        echo = true;
-        for(GameController gameController : games.values()) {
-            gameController.echoOn();
-        }
-    }
-
-    /**
      * Starts the lobby execution that continuously processes requests from clients until the server is shut down.
      */
     public void startLobby() {
@@ -121,8 +102,7 @@ public class Lobby implements ServerNetworkObserver {
                 return;
             } catch (RuntimeException e) {
                 //one broken request must not take down the lobby, and with it every client still in it
-                System.err.println("Lobby: dropping a request that failed with " + e);
-                e.printStackTrace();
+                LOG.log(Level.WARNING, "Lobby: dropping a request that failed", e);
             }
         }
     }
@@ -173,11 +153,7 @@ public class Lobby implements ServerNetworkObserver {
         if(!connectedClients.contains(client)) {
             connectedClients.add(client);
         }
-        if (echo) {
-            String username = "";
-            if(client.getUsername() != null){ username = client.getUsername() + " "; }
-            System.out.println("Client '"+username+ "' is now in the lobby");
-        }
+        LOG.info(() -> "Client '" + (client.getUsername() == null ? "" : client.getUsername()) + "' is now in the lobby");
         client.send(LobbyMessageGenerator.joinedLobbyMessage());
     }
 
@@ -190,9 +166,7 @@ public class Lobby implements ServerNetworkObserver {
         if (client.getUsername() != null) {
             takenUsernames.remove(client.getUsername());
         }
-        if (echo) {
-            System.out.println("Client '" + client.getUsername() + "' left the lobby");
-        }
+        LOG.info(() -> "Client '" + client.getUsername() + "' left the lobby");
         client.shutdown();
     }
 
@@ -213,9 +187,7 @@ public class Lobby implements ServerNetworkObserver {
         client.setUsername(username);
         if (oldUsername != null) {
             takenUsernames.remove(oldUsername);
-            if (echo) {
-                System.out.println("Client '" + oldUsername + "' changed their username to '" + username + "'");
-            }
+            LOG.info(() -> "Client '" + oldUsername + "' changed their username to '" + username + "'");
         }
     }
 
@@ -231,7 +203,7 @@ public class Lobby implements ServerNetworkObserver {
             throw new CannotCreateGameException("A game needs " + MIN_PLAYERS + " to " + MAX_PLAYERS + " players!");
         }
         if(games.containsKey(gameName)) throw new CannotCreateGameException("Game name already taken!");
-        GameController newGameController = new GameController(this,numberOfPlayers,gameName, echo);
+        GameController newGameController = new GameController(this, numberOfPlayers, gameName);
         games.put(gameName, newGameController);
         availableGames.put(gameName,newGameController);
         newGameController.submitJoin(client, LobbyMessageGenerator.createdGameMessage());
@@ -270,9 +242,7 @@ public class Lobby implements ServerNetworkObserver {
 
     @Override
     public void notifyConnectionLoss(ClientHandler clientHandler) {
-        if (echo) {
-            System.out.println("Client '" + clientHandler.getUsername() + "' lost connection");
-        }
+        LOG.info(() -> "Client '" + clientHandler.getUsername() + "' lost connection");
         tasks.add(() -> leaveLobby(clientHandler));
     }
 
