@@ -4,7 +4,6 @@ import it.polimi.ingsw.network.ClientHandler;
 import it.polimi.ingsw.network.ServerWelcomeSocket;
 import it.polimi.ingsw.network.ServerNetworkObserver;
 import it.polimi.ingsw.server.controller.GameController;
-import it.polimi.ingsw.server.view.ServerView;
 import it.polimi.ingsw.util.customexceptions.*;
 import it.polimi.ingsw.util.supportclasses.Request;
 import org.json.simple.JSONObject;
@@ -46,7 +45,6 @@ public class Lobby implements ServerNetworkObserver {
         requests = new LinkedBlockingQueue<>();
         executorService = Executors.newCachedThreadPool();
         lobbyRequestHandler = new LobbyRequestHandler(this);
-        ServerView.getInstance(this);
         echo = false;
         running = true;
 

@@ -3,6 +3,7 @@ package it.polimi.ingsw;
 import it.polimi.ingsw.client.view.CLI.ClientCLI;
 import it.polimi.ingsw.client.view.GUI.ClientGUI;
 import it.polimi.ingsw.server.lobby.Lobby;
+import it.polimi.ingsw.server.view.ServerView;
 import javafx.application.Application;
 
 /**
@@ -34,6 +35,7 @@ public class Codex {
                 System.out.println("unexpected argument: " + args[1]);
         } else if (args[0].equals("server")) {
             codex.setLobby(new Lobby());
+            ServerView.getInstance(codex.getLobby());
             codex.getLobby().startLobby();
         } else {
             printUsageMessage();
