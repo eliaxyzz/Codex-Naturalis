@@ -12,7 +12,7 @@ import static it.polimi.ingsw.util.supportclasses.Constants.MAX_HAND_SIZE;
  *  including their assigned token color, score, hand of cards, starter card, secret objective,
  *  drawn objective card choices, and various flags indicating player actions.
  */
-public class Player {
+public class Player implements Comparable<Player> {
     private final Token token;
     private int score;
     private final Game game;
@@ -214,10 +214,11 @@ public class Player {
     }
 
     /**
-     * compares a player's attribute with another player
+     * Leaderboard order: higher score first, ties broken by more completed objectives.
      * @param other other player in the comparison
      * @return the result of the comparison
      */
+    @Override
     public int compareTo (Player other){
         if (this.getScore() > other.getScore()) return -1;
         else if (this.getScore() < other.getScore()) return 1;

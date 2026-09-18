@@ -15,7 +15,9 @@ import java.util.Map;
  * It keeps track of the cards placed on the grid, categorized by type (plant, animal, fungi, insect), as well as resource counts associated with placed cards.
  */
 public class GameField {
-    private final HashMap<String, PlaceableCard> cardsGrid;
+    private record Coordinate(int x, int y) {}
+
+    private final Map<Coordinate, PlaceableCard> cardsGrid;
     private final Map<Resource, Integer> resourceCounts;
     private final Map<Resource, List<PlaceableCard>> cardsByKingdom;
     private final ArrayList<PlaceableCard> placementHistory;
@@ -90,7 +92,7 @@ public class GameField {
      */
     public PlaceableCard lookAtCoordinates(int x, int y){
         if(x<-40 || y<-40 || x>40 || y>40) return null;
-        else return cardsGrid.get(coordinatesToString(x,y));
+        else return cardsGrid.get(new Coordinate(x, y));
     }
 
     /**
@@ -100,17 +102,7 @@ public class GameField {
      * @param y The y coordinate.
      */
     private void placeCardAtCoordinates(PlaceableCard card, int x, int y){
-        cardsGrid.put(coordinatesToString(x,y),card);
-    }
-
-    /**
-     * Converts coordinates to string.
-     * @param x The x coordinate.
-     * @param y The y coordinate.
-     * @return The coordinates converted to String like: "x,y"
-     */
-    private String coordinatesToString(int x, int y){
-        return x + "," + y;
+        cardsGrid.put(new Coordinate(x, y), card);
     }
 
     /**
