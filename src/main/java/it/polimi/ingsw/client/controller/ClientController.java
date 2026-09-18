@@ -14,10 +14,15 @@ public class ClientController implements ClientNetworkObserver {
 
     private final ClientConnectionManager clientConnectionManager;
     private final ClientMessageHandler clientMessageHandler;
-    private static ClientController instance;
+    private static volatile ClientController instance;
 
-    public static ClientController getInstance(String serverAddress, int serverPort) throws ServerUnreachableException {
-        if (instance == null) instance = new ClientController(serverAddress, serverPort);
+    /**
+     * Opens a connection to the server, closing the previous one if there was any.
+     * @throws ServerUnreachableException If nothing answers at that address.
+     */
+    public static synchronized ClientController connect(String serverAddress, int serverPort) throws ServerUnreachableException {
+        if (instance != null) instance.shutdown();
+        instance = new ClientController(serverAddress, serverPort);
         return instance;
     }
 
@@ -26,21 +31,19 @@ public class ClientController implements ClientNetworkObserver {
      * `ClientController` exists throughout the application.
      * @return The singleton instance.
      * @throws IllegalStateException if the client hasn't connected to a server yet via
-     * {@link #getInstance(String, int)}. There's no sane server to fall back to here,
+     * {@link #connect(String, int)}. There's no sane server to fall back to here,
      * so failing loudly beats silently talking to the wrong one.
      */
     public static ClientController getInstance() {
         if (instance == null) {
-            throw new IllegalStateException("ClientController requested before a connection was established. Call getInstance(serverAddress, serverPort) first.");
+            throw new IllegalStateException("ClientController requested before a connection was established. Call connect(serverAddress, serverPort) first.");
         }
         return instance;
     }
 
-    public ClientController (String serverAddress, int serverPort) throws ServerUnreachableException {
+    private ClientController (String serverAddress, int serverPort) throws ServerUnreachableException {
         clientMessageHandler = new ClientMessageHandler();
-
         clientConnectionManager = new ClientConnectionManager(this,serverAddress,serverPort);
-        instance = this;
     }
 
     /**

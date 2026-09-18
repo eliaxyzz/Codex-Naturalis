@@ -17,7 +17,8 @@ import static it.polimi.ingsw.util.supportclasses.ViewConstants.*;
  */
 public class StageManager {
     private static Stage currentStage;
-    private static ViewController currentViewController;
+    //set on the UI thread when a scene loads, read by the network thread to report errors
+    private static volatile ViewController currentViewController;
 
     public static void setCurrentStage(Stage currentStage) {
         StageManager.currentStage = currentStage;

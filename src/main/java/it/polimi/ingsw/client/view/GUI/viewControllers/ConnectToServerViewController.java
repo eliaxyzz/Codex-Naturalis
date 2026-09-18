@@ -70,7 +70,7 @@ public class ConnectToServerViewController extends ViewController {
 
 
         try {
-            ClientController.getInstance(givenIp, Integer.parseInt(givenPort));
+            ClientController.connect(givenIp, Integer.parseInt(givenPort));
         } catch (ServerUnreachableException e) {
             showErrorMessage("Server unreachable");
         }

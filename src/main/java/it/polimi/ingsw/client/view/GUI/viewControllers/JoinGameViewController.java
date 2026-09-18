@@ -92,7 +92,9 @@ public class JoinGameViewController extends ViewController {
      */
     @Override
     public void showErrorMessage(String message){
-        Platform.runLater(() -> alertLabel.setText(message));
-        alertLabel.setVisible(true);
+        Platform.runLater(() -> {
+            alertLabel.setText(message);
+            alertLabel.setVisible(true);
+        });
     }
 }

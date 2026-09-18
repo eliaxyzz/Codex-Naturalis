@@ -36,7 +36,7 @@ public class ClientCLI {
         int port = getServerPort();
         StageManager.enableCLIMode();
         try {
-            ClientController.getInstance(address, port);
+            ClientController.connect(address, port);
         } catch (ServerUnreachableException e) {
             System.out.println("Could not connect to server.");
             System.exit(1);
