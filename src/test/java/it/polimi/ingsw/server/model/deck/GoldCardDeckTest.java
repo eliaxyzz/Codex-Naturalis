@@ -28,14 +28,14 @@ class GoldCardDeckTest {
         assertEquals(38, goldCardDeck.cards.size());
     }
     @Test
-    void getLeftRevealedCard() {
+    void getLeftRevealedCard() throws EmptyDeckException {
 
         Card leftrevealedcard = goldCardDeck.drawLeftRevealedCard();
         assertEquals(leftrevealedcard.getClass(), GoldCard.class);
     }
 
     @Test
-    void getRightRevealedCard() {
+    void getRightRevealedCard() throws EmptyDeckException {
 
         Card rightrevealedcard = goldCardDeck.drawRightRevealedCard();
         assertEquals(rightrevealedcard.getClass(), GoldCard.class);

@@ -61,6 +61,56 @@ class LobbyFlowTest {
     }
 
     @Test
+    void outOfRangePlayerCountIsRejectedAndTheLobbyKeepsWorking() throws Exception {
+        TestClient alice = server.connect("alice");
+        alice.send("setUp", "gameName", "crowd", "numOfPlayers", "9");
+        assertNotNull(alice.await("cannotCreateGame"));
+        alice.send("setUp", "gameName", "empty", "numOfPlayers", "0");
+        assertNotNull(alice.await("cannotCreateGame"));
+
+        alice.send("setUp", "gameName", "fine", "numOfPlayers", "2");
+        assertNotNull(alice.await("gameCreated"));
+    }
+
+    @Test
+    void failedRenameKeepsTheOldNameReserved() throws Exception {
+        server.connect("alice");
+        TestClient bob = server.connect("bob");
+        bob.send("setUsername", "username", "alice");
+        bob.await("usernameAlreadyTaken");
+
+        TestClient carol = server.connect("carol");
+        carol.send("setUsername", "username", "bob");
+        assertNotNull(carol.await("usernameAlreadyTaken"));
+    }
+
+    @Test
+    void nonObjectJsonDoesNotKillTheConnection() throws Exception {
+        TestClient alice = server.connect("alice");
+        alice.sendRaw("[]");
+        alice.sendRaw("42");
+        alice.send("setUsername", "username", "alicia");
+        assertEquals("alicia", alice.await("usernameSet").get("username"));
+    }
+
+    @Test
+    void cardChoicesSentTooEarlyDoNotBreakTheGame() throws Exception {
+        TestClient alice = server.connect("alice");
+        TestClient bob = server.connect("bob");
+        alice.send("setUp", "gameName", "eager", "numOfPlayers", "2");
+        alice.await("gameCreated");
+        alice.send("starterCard", "starterCardId", "81", "facingUp", "true");
+        alice.send("objectiveCard", "objectiveCardId", "87");
+
+        bob.send("join", "gameName", "eager");
+        bob.await("joinGame");
+        alice.send("ready");
+        bob.send("ready");
+        assertNotNull(alice.await("cardsSelection"));
+        assertNotNull(bob.await("cardsSelection"));
+    }
+
+    @Test
     void duplicateGameNameIsRejected() throws Exception {
         TestClient alice = server.connect("alice");
         TestClient bob = server.connect("bob");

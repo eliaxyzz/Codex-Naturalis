@@ -15,6 +15,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import static it.polimi.ingsw.util.supportclasses.Constants.MAX_PLAYERS;
+import static it.polimi.ingsw.util.supportclasses.Constants.MIN_PLAYERS;
 
 /**
  * This class represents the lobby where players can create or join a game and set their usernames.
@@ -28,7 +30,7 @@ public class Lobby implements ServerNetworkObserver {
     private final List<ClientHandler> connectedClients;
     private final Map<String, GameController> games;
     private final Map<String, GameController> availableGames;
-    private final List<String> takenUsernames;
+    private final Set<String> takenUsernames;
     private ServerWelcomeSocket serverWelcomeSocket = null;
     private boolean welcomeSocketIsRunning = false;
     private int welcomeSocketPort;
@@ -41,7 +43,7 @@ public class Lobby implements ServerNetworkObserver {
         connectedClients = new CopyOnWriteArrayList<>();
         games = new ConcurrentHashMap<>();
         availableGames = new ConcurrentHashMap<>();
-        takenUsernames = new CopyOnWriteArrayList<>();
+        takenUsernames = ConcurrentHashMap.newKeySet();
         requests = new LinkedBlockingQueue<>();
         executorService = Executors.newCachedThreadPool();
         lobbyRequestHandler = new LobbyRequestHandler(this);
@@ -117,6 +119,11 @@ public class Lobby implements ServerNetworkObserver {
                 lobbyRequestHandler.execute(requests.take());
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
+                return;
+            } catch (RuntimeException e) {
+                //one broken request must not take down the lobby, and with it every client still in it
+                System.err.println("Lobby: dropping a request that failed with " + e);
+                e.printStackTrace();
             }
         }
     }
@@ -177,7 +184,9 @@ public class Lobby implements ServerNetworkObserver {
      */
     public void leaveLobby(ClientHandler client) {
         connectedClients.remove(client);
-        takenUsernames.remove(client.getUsername());
+        if (client.getUsername() != null) {
+            takenUsernames.remove(client.getUsername());
+        }
         if (echo) {
             System.out.println("Client '" + client.getUsername() + "' left the lobby");
         }
@@ -191,21 +200,19 @@ public class Lobby implements ServerNetworkObserver {
      * @throws AlreadyTakenUsernameException Thrown when trying to choose an already taken username.
      */
     public void setUsername(String username, ClientHandler client) throws AlreadyTakenUsernameException {
-        if (client.getUsername() != null) {
-            takenUsernames.remove(client.getUsername()); //the client had already a registered username, so now it's going to be changed
-        }
-        if (!takenUsernames.contains(username)) {
-            String oldUsername = client.getUsername();
-            takenUsernames.add(username);
-            client.setUsername(username);
-            if(echo) {
-                if (oldUsername != null) {
-                    System.out.println("Client '" + oldUsername + "' changed their username to '" + username +"'");
-                }
-            }
-        }
-        else {
+        if (username.equals(client.getUsername())) return;
+        //claim the new name first: add() is atomic, so two clients racing for it can't both win,
+        //and a failed rename leaves the old name reserved
+        if (!takenUsernames.add(username)) {
             throw new AlreadyTakenUsernameException();
+        }
+        String oldUsername = client.getUsername();
+        client.setUsername(username);
+        if (oldUsername != null) {
+            takenUsernames.remove(oldUsername);
+            if (echo) {
+                System.out.println("Client '" + oldUsername + "' changed their username to '" + username + "'");
+            }
         }
     }
 
@@ -216,6 +223,9 @@ public class Lobby implements ServerNetworkObserver {
      */
     public void setupNewGame(int numberOfPlayers, String gameName, ClientHandler client) throws CannotCreateGameException {
         if(gameName == null) throw new CannotCreateGameException("Invalid name!");
+        if(numberOfPlayers < MIN_PLAYERS || numberOfPlayers > MAX_PLAYERS) {
+            throw new CannotCreateGameException("A game needs " + MIN_PLAYERS + " to " + MAX_PLAYERS + " players!");
+        }
         if(games.containsKey(gameName)) throw new CannotCreateGameException("Game name already taken!");
         GameController newGameController = new GameController(this,numberOfPlayers,gameName, echo);
         games.put(gameName, newGameController);

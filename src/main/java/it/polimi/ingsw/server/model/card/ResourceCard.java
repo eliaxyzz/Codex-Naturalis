@@ -18,10 +18,8 @@ public class ResourceCard extends PlaceableCard {
             JsonCardsReader.loadResourceCard(id, this);
         } catch (CannotOpenJSONException e) {
             throw new RuntimeException(e);
-        }
-        catch (InvalidIdException e)
-        {
-            System.err.println(e.getMessage());
+        } catch (InvalidIdException e) {
+            throw new IllegalArgumentException(e.getMessage(), e);
         }
     }
 

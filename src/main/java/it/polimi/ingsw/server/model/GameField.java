@@ -153,10 +153,11 @@ public class GameField {
      * @param y The y coordinate.
      */
     public void place(PlaceableCard card, boolean facingUp, int x, int y) throws CannotPlaceCardException {
-        card.setFacingUp(facingUp);
         if (this.lookAtCoordinates(x,y)!=null) throw new CannotPlaceCardException("There's already a card placed there!");
         if (!this.followsPlacementRules(x,y)) throw new CannotPlaceCardException("You can't place a card there!");
-        if (!this.followsPlacementRequirements(card)) throw new CannotPlaceCardException("You don't have enough resources to place this card!");
+        if (!this.followsPlacementRequirements(card, facingUp)) throw new CannotPlaceCardException("You don't have enough resources to place this card!");
+        //only touch the card once the move is known to be legal: a rejected card goes back to the hand as it was
+        card.setFacingUp(facingUp);
         this.placeCardAtCoordinates(card,x,y);
         card.setX(x);
         card.setY(y);
@@ -235,11 +236,12 @@ public class GameField {
     /**
      * Checks if the requirements for placing the card are matched.
      * @param placeableCard Card to check the requirements.
+     * @param facingUp The side the card would be placed on: the back never has requirements.
      * @return true if the requirements for placing the card are matched, false otherwise.
      */
-    private boolean followsPlacementRequirements (PlaceableCard placeableCard){
+    private boolean followsPlacementRequirements (PlaceableCard placeableCard, boolean facingUp){
 
-        if(!placeableCard.isFacingUp()) return true;
+        if(!facingUp) return true;
         return placeableCard.getRequiredAnimalResourceAmount() <= getAnimalCount() &&
                 placeableCard.getRequiredFungiResourceAmount() <= getFungiCount() &&
                 placeableCard.getRequiredInsectResourceAmount() <= getInsectCount() &&

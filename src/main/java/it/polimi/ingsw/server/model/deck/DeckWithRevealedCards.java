@@ -25,30 +25,28 @@ public abstract class DeckWithRevealedCards<T extends Card> extends Deck<T>{
     /**
      * Draws the left revealed card from the board and replaces it with the top card of the deck.
      * @return The drawn card.
+     * @throws EmptyDeckException If the slot is empty because the deck ran out.
      */
-    public T drawLeftRevealedCard() {
-        T selectedCard;
-        selectedCard = leftRevealedCard;
-        try {
-            leftRevealedCard = this.directDraw();
-        } catch (EmptyDeckException e) {
-            leftRevealedCard = null; //no cards left
-        }
+    public T drawLeftRevealedCard() throws EmptyDeckException {
+        if (leftRevealedCard == null) throw new EmptyDeckException();
+        T selectedCard = leftRevealedCard;
+        leftRevealedCard = topCardOrNull();
         return selectedCard;
     }
 
     /**
      * Draws the right revealed card from the board and replaces it with the top card of the deck.
      * @return The drawn card.
+     * @throws EmptyDeckException If the slot is empty because the deck ran out.
      */
-    public T drawRightRevealedCard() {
-        T selectedCard;
-        selectedCard = rightRevealedCard;
-        try {
-            rightRevealedCard = this.directDraw();
-        } catch (EmptyDeckException e) {
-            rightRevealedCard = null; //no cards left
-        }
+    public T drawRightRevealedCard() throws EmptyDeckException {
+        if (rightRevealedCard == null) throw new EmptyDeckException();
+        T selectedCard = rightRevealedCard;
+        rightRevealedCard = topCardOrNull();
         return selectedCard;
+    }
+
+    private T topCardOrNull() {
+        return cards.isEmpty() ? null : cards.removeFirst();
     }
 }

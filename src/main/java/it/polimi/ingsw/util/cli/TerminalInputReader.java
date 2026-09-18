@@ -20,8 +20,9 @@ public abstract class TerminalInputReader implements Runnable {
             try {
                 commandParser.parse(scanner.nextLine());
             }
-            catch (NoSuchElementException e) {
-                System.out.println("Error reading input. Please try again.");
+            catch (NoSuchElementException | IllegalStateException e) {
+                //stdin is closed (EOF or shutdown): there's nothing left to read, and retrying would spin forever
+                running = false;
             }
         }
     }

@@ -159,6 +159,8 @@ public class GameRequestHandler {
             gameController.drawLeftRevealedResourceCard(client);
             client.send(messageGenerator.updatedHandMessage(gameController.getCurrentPlayer(client)));
             gameController.broadcast(messageGenerator.updatedDecksMessage());
+        } catch (EmptyDeckException e) {
+            client.send(messageGenerator.cannotDrawMessage("There's no card left there"));
         } catch (CannotDrawException e) {
             client.send(messageGenerator.cannotDrawMessage("You must place a card before drawing"));
         } catch (NotYourTurnException e) {
@@ -177,6 +179,8 @@ public class GameRequestHandler {
             gameController.drawRightRevealedResourceCard(client);
             client.send(messageGenerator.updatedHandMessage(gameController.getCurrentPlayer(client)));
             gameController.broadcast(messageGenerator.updatedDecksMessage());
+        } catch (EmptyDeckException e) {
+            client.send(messageGenerator.cannotDrawMessage("There's no card left there"));
         } catch (CannotDrawException e) {
             client.send(messageGenerator.cannotDrawMessage("You must place a card before drawing"));
         } catch (NotYourTurnException e) {
@@ -195,6 +199,8 @@ public class GameRequestHandler {
             gameController.drawLeftRevealedGoldCard(client);
             client.send(messageGenerator.updatedHandMessage(gameController.getCurrentPlayer(client)));
             gameController.broadcast(messageGenerator.updatedDecksMessage());
+        } catch (EmptyDeckException e) {
+            client.send(messageGenerator.cannotDrawMessage("There's no card left there"));
         } catch (CannotDrawException e) {
             client.send(messageGenerator.cannotDrawMessage("You must place a card before drawing"));
         } catch (NotYourTurnException e) {
@@ -213,6 +219,8 @@ public class GameRequestHandler {
             gameController.drawRightRevealedGoldCard(client);
             client.send(messageGenerator.updatedHandMessage(gameController.getCurrentPlayer(client)));
             gameController.broadcast(messageGenerator.updatedDecksMessage());
+        } catch (EmptyDeckException e) {
+            client.send(messageGenerator.cannotDrawMessage("There's no card left there"));
         } catch (CannotDrawException e) {
             client.send(messageGenerator.cannotDrawMessage("You must place a card before drawing"));
         } catch (NotYourTurnException e) {

@@ -6,7 +6,6 @@ import it.polimi.ingsw.util.customexceptions.CannotOpenJSONException;
 import it.polimi.ingsw.util.customexceptions.InvalidIdException;
 import it.polimi.ingsw.util.supportclasses.*;
 import java.util.ArrayList;
-import java.util.Collections;
 
 /**
  * This class represents a Starter card.
@@ -22,10 +21,8 @@ public class StarterCard extends PlaceableCard {
             JsonCardsReader.loadStarterCard(id,this);
         } catch (CannotOpenJSONException e) {
             throw new RuntimeException(e);
-        }
-        catch (InvalidIdException e)
-        {
-            System.err.println(e.getMessage());
+        } catch (InvalidIdException e) {
+            throw new IllegalArgumentException(e.getMessage(), e);
         }
     }
 
@@ -47,17 +44,4 @@ public class StarterCard extends PlaceableCard {
         return backCentralResources;
     }
 
-    @Override
-    public boolean equals(Object obj) {
-        if(!(obj instanceof StarterCard other)) return false;
-        if(this.getBackCentralResources().size() != other.getBackCentralResources().size()) return false;
-        ArrayList<Resource> otherBackCentralResources = new ArrayList<>(other.getBackCentralResources());
-        ArrayList<Resource> thisBackCentralResources = new ArrayList<>(this.getBackCentralResources());
-        Collections.sort(thisBackCentralResources);
-        Collections.sort(otherBackCentralResources);
-        for(int i = 0; i < thisBackCentralResources.size(); i++) {
-            if(thisBackCentralResources.get(i) != otherBackCentralResources.get(i)) return false;
-        }
-        return true;
-    }
 }

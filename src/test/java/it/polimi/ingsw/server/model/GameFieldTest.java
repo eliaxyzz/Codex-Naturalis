@@ -121,4 +121,13 @@ class GameFieldTest {
         gameField.place(new StarterCard(82), true);
         assertThrows(CannotPlaceCardException.class, () -> gameField.place(new GoldCard(72),true,1,1));
     }
+
+    @Test
+    void rejectedPlacementDoesNotFlipTheCard() {
+        gameField.place(new StarterCard(82), true);
+        GoldCard card = new GoldCard(72);
+        card.setFacingUp(false);
+        assertThrows(CannotPlaceCardException.class, () -> gameField.place(card, true, 1, 1));
+        assertFalse(card.isFacingUp());
+    }
 }

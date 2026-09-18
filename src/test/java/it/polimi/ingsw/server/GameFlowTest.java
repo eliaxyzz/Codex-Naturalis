@@ -80,6 +80,7 @@ class GameFlowTest {
     @Test
     void droppedConnectionMidGameClosesTheGameForTheOthers() throws Exception {
         second.close();
-        assertNotNull(first.await("closingGame", 10_000));
+        // a closed socket is an EOF on the server side, no need to wait for the pinger to give up
+        assertNotNull(first.await("closingGame", 1500));
     }
 }

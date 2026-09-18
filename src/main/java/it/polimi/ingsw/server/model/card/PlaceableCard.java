@@ -155,29 +155,4 @@ public abstract class PlaceableCard extends Card {
      * @return Points earned by placing the card.
      */
     public abstract int placementPoints(GameField gameField);
-
-    @Override
-    @SuppressWarnings("all")
-    public boolean equals(Object obj) {
-        if(!(obj instanceof PlaceableCard card)) return false;
-        if(this.id!=card.id) return false;
-        else if (this.cardKingdom != card.cardKingdom) return false;
-        else if (this.facingUp != card.facingUp) return false;
-        else if (this.x != card.x) return false;
-        else if (this.y != card.y) return false;
-        else if (this.requiredAnimalResourceAmount != card.requiredAnimalResourceAmount) return false;
-        else if (this.requiredFungiResourceAmount != card.requiredFungiResourceAmount) return false;
-        else if (this.requiredInsectResourceAmount != card.requiredInsectResourceAmount) return false;
-        else if (this.requiredPlantResourceAmount != card.requiredPlantResourceAmount) return false;
-        else if (!this.backTopLeftCorner.equals(card.backTopLeftCorner)) return false;
-        else if (!this.backTopRightCorner.equals(card.backTopRightCorner)) return false;
-        else if (!this.backBottomLeftCorner.equals(card.backBottomLeftCorner)) return false;
-        else if (!this.backBottomRightCorner.equals(card.backBottomRightCorner)) return false;
-        else if (!this.frontTopLeftCorner.equals(card.frontTopLeftCorner)) return false;
-        else if (!this.frontTopRightCorner.equals(card.frontTopRightCorner)) return false;
-        else if (!this.frontBottomLeftCorner.equals(card.frontBottomLeftCorner)) return false;
-        else if (!this.frontBottomRightCorner.equals(card.frontBottomRightCorner)) return false;
-        return true;
-    }
-
 }

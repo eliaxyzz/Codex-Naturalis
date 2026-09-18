@@ -58,6 +58,10 @@ public class GameController implements Runnable, ServerNetworkObserver, GameObse
                 gameRequestHandler.execute(requests.take());
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
+                return;
+            } catch (RuntimeException e) {
+                System.err.println("Game '" + gameName + "': dropping a request that failed with " + e);
+                e.printStackTrace();
             }
         }
     }
@@ -334,8 +338,9 @@ public class GameController implements Runnable, ServerNetworkObserver, GameObse
      * @throws NotYourTurnException Thrown if it's not the player's turn.
      * @throws FullHandException Thrown if the player's hand is already full.
      * @throws CannotDrawException Thrown if the player hasn't placed a card yet this turn.
+     * @throws EmptyDeckException Thrown if there's no card left in that slot.
      */
-    public void drawLeftRevealedResourceCard (ClientHandler client) throws FullHandException, NotYourTurnException, CannotDrawException {
+    public void drawLeftRevealedResourceCard (ClientHandler client) throws EmptyDeckException, FullHandException, NotYourTurnException, CannotDrawException {
         checkCanDraw(client);
         addDrawnCardAndAdvance(client, game.getResourceCardDeck().drawLeftRevealedCard(), "the left revealed resource card");
     }
@@ -346,8 +351,9 @@ public class GameController implements Runnable, ServerNetworkObserver, GameObse
      * @throws NotYourTurnException Thrown if it's not the player's turn.
      * @throws FullHandException Thrown if the player's hand is already full.
      * @throws CannotDrawException Thrown if the player hasn't placed a card yet this turn.
+     * @throws EmptyDeckException Thrown if there's no card left in that slot.
      */
-    public void drawRightRevealedResourceCard (ClientHandler client) throws FullHandException, NotYourTurnException, CannotDrawException {
+    public void drawRightRevealedResourceCard (ClientHandler client) throws EmptyDeckException, FullHandException, NotYourTurnException, CannotDrawException {
         checkCanDraw(client);
         addDrawnCardAndAdvance(client, game.getResourceCardDeck().drawRightRevealedCard(), "the right revealed resource card");
     }
@@ -358,8 +364,9 @@ public class GameController implements Runnable, ServerNetworkObserver, GameObse
      * @throws NotYourTurnException Thrown if it's not the player's turn.
      * @throws FullHandException Thrown if the player's hand is already full.
      * @throws CannotDrawException Thrown if the player hasn't placed a card yet this turn.
+     * @throws EmptyDeckException Thrown if there's no card left in that slot.
      */
-    public void drawLeftRevealedGoldCard (ClientHandler client) throws FullHandException, NotYourTurnException, CannotDrawException {
+    public void drawLeftRevealedGoldCard (ClientHandler client) throws EmptyDeckException, FullHandException, NotYourTurnException, CannotDrawException {
         checkCanDraw(client);
         addDrawnCardAndAdvance(client, game.getGoldCardDeck().drawLeftRevealedCard(), "the left revealed gold card");
     }
@@ -370,8 +377,9 @@ public class GameController implements Runnable, ServerNetworkObserver, GameObse
      * @throws NotYourTurnException Thrown if it's not the player's turn.
      * @throws FullHandException Thrown if the player's hand is already full.
      * @throws CannotDrawException Thrown if the player hasn't placed a card yet this turn.
+     * @throws EmptyDeckException Thrown if there's no card left in that slot.
      */
-    public void drawRightRevealedGoldCard (ClientHandler client) throws FullHandException, NotYourTurnException, CannotDrawException {
+    public void drawRightRevealedGoldCard (ClientHandler client) throws EmptyDeckException, FullHandException, NotYourTurnException, CannotDrawException {
         checkCanDraw(client);
         addDrawnCardAndAdvance(client, game.getGoldCardDeck().drawRightRevealedCard(), "the right revealed gold card");
     }

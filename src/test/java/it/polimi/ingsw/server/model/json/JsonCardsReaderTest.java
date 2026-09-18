@@ -4,6 +4,7 @@ import it.polimi.ingsw.server.model.card.GoldCardStrategy.GoldCardContext;
 import it.polimi.ingsw.server.model.card.GoldCardStrategy.GoldCardFeatherStrategy;
 import it.polimi.ingsw.server.model.card.Corner;
 import it.polimi.ingsw.server.model.card.GoldCard;
+import it.polimi.ingsw.server.model.card.PlaceableCard;
 import it.polimi.ingsw.server.model.card.ResourceCard;
 import it.polimi.ingsw.server.model.card.StarterCard;
 import it.polimi.ingsw.util.customexceptions.CannotOpenJSONException;
@@ -12,6 +13,8 @@ import it.polimi.ingsw.util.supportclasses.Resource;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -46,7 +49,7 @@ class JsonCardsReaderTest {
         {
             System.err.println(e.getMessage());
         }
-        assertEquals(referenceResourceCard, testcard);
+        assertSameCard(referenceResourceCard, testcard);
     }
     @Test
     void ValidResourceCardId() {
@@ -83,7 +86,8 @@ class JsonCardsReaderTest {
         {
             System.err.println(e.getMessage());
         }
-        assertEquals(referenceGoldCard, testCard);
+        assertSameCard(referenceGoldCard, testCard);
+        assertEquals(referenceGoldCard.getContext(), testCard.getContext());
     }
 
     @Test
@@ -119,11 +123,40 @@ class JsonCardsReaderTest {
         {
             System.err.println(e.getMessage());
         }
-        assertEquals(referenceStarterCard, testCard);
+        assertSameCard(referenceStarterCard, testCard);
+        assertEquals(sorted(referenceStarterCard.getBackCentralResources()), sorted(testCard.getBackCentralResources()));
     }
     @Test
     void ValidStarterCardId() {
         StarterCard referenceStarterCard = new StarterCard();
         assertThrows(InvalidIdException.class, ()-> JsonCardsReader.loadStarterCard(66, referenceStarterCard));
+    }
+
+    /**
+     * Cards are equal by id alone, which would make these tests pass for any content,
+     * so compare what the JSON is actually supposed to fill in.
+     */
+    private static void assertSameCard(PlaceableCard expected, PlaceableCard actual) {
+        assertEquals(expected.getId(), actual.getId());
+        assertEquals(expected.getCardKingdom(), actual.getCardKingdom());
+        assertEquals(expected.getPoints(), actual.getPoints());
+        assertEquals(expected.getRequiredAnimalResourceAmount(), actual.getRequiredAnimalResourceAmount());
+        assertEquals(expected.getRequiredFungiResourceAmount(), actual.getRequiredFungiResourceAmount());
+        assertEquals(expected.getRequiredInsectResourceAmount(), actual.getRequiredInsectResourceAmount());
+        assertEquals(expected.getRequiredPlantResourceAmount(), actual.getRequiredPlantResourceAmount());
+        for (boolean side : new boolean[]{true, false}) {
+            expected.setFacingUp(side);
+            actual.setFacingUp(side);
+            assertEquals(expected.getTopLeftCorner(), actual.getTopLeftCorner());
+            assertEquals(expected.getTopRightCorner(), actual.getTopRightCorner());
+            assertEquals(expected.getBottomLeftCorner(), actual.getBottomLeftCorner());
+            assertEquals(expected.getBottomRightCorner(), actual.getBottomRightCorner());
+        }
+    }
+
+    private static List<Resource> sorted(List<Resource> resources) {
+        List<Resource> copy = new ArrayList<>(resources);
+        Collections.sort(copy);
+        return copy;
     }
 }

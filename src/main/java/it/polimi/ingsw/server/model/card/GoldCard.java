@@ -20,18 +20,9 @@ public class GoldCard extends PlaceableCard {
             JsonCardsReader.loadGoldCard(id,this);
         } catch (CannotOpenJSONException e) {
             throw new RuntimeException(e);
+        } catch (InvalidIdException e) {
+            throw new IllegalArgumentException(e.getMessage(), e);
         }
-        catch (InvalidIdException e)
-        {
-            System.err.println(e.getMessage());
-        }
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        if(!(obj instanceof GoldCard other)) { return super.equals(obj); }
-        if (!this.context.equals(other.context)) return false;
-        return super.equals(obj);
     }
 
     /**
@@ -41,6 +32,10 @@ public class GoldCard extends PlaceableCard {
      */
     public int placementPoints(GameField gameField) {
         return context.executePointsCalculation(this.getPoints(),gameField,this);
+    }
+
+    public GoldCardContext getContext() {
+        return context;
     }
 
     public void setContext(GoldCardContext context) {

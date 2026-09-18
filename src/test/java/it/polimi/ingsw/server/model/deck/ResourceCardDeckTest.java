@@ -27,14 +27,14 @@ class ResourceCardDeckTest {
         assertEquals(38, resourceCardDeck.cards.size());
     }
     @Test
-    void getLeftRevealedCard() {
+    void getLeftRevealedCard() throws EmptyDeckException {
 
         Card leftrevealedcard = resourceCardDeck.drawLeftRevealedCard();
         assertEquals(leftrevealedcard.getClass(), ResourceCard.class);
     }
 
     @Test
-    void getRightRevealedCard() {
+    void getRightRevealedCard() throws EmptyDeckException {
 
         Card rightrevealedcard = resourceCardDeck.drawRightRevealedCard();
         assertEquals(rightrevealedcard.getClass(), ResourceCard.class);
@@ -63,5 +63,14 @@ class ResourceCardDeckTest {
             }
         }
         assertThrows(EmptyDeckException.class,()-> resourceCardDeck.directDraw());
+    }
+
+    @Test
+    void drawingFromAnEmptyRevealedSlotThrows() throws EmptyDeckException {
+        while (!resourceCardDeck.isEmpty()) {
+            resourceCardDeck.directDraw();
+        }
+        assertNotNull(resourceCardDeck.drawLeftRevealedCard());
+        assertThrows(EmptyDeckException.class, () -> resourceCardDeck.drawLeftRevealedCard());
     }
 }
