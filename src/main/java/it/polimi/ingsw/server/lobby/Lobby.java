@@ -6,7 +6,6 @@ import it.polimi.ingsw.network.ServerNetworkObserver;
 import it.polimi.ingsw.server.controller.GameController;
 import it.polimi.ingsw.util.customexceptions.*;
 import it.polimi.ingsw.util.supportclasses.Request;
-import org.json.simple.JSONObject;
 import java.util.*;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
@@ -20,13 +19,13 @@ import static it.polimi.ingsw.util.supportclasses.Constants.MIN_PLAYERS;
 
 /**
  * This class represents the lobby where players can create or join a game and set their usernames.
- * Its state is reachable from more than one thread at once (the welcome socket hands off new
- * connections directly, and each game's own thread calls back in on disconnects and game-start),
- * so the collections below need to be thread-safe rather than plain ArrayList/HashMap.
+ * Lobby state changes on the lobby thread: requests, new connections and disconnects are queued
+ * as tasks. The collections are still concurrent because games (closing, going unavailable) and
+ * the server console touch them from their own threads.
  */
 public class Lobby implements ServerNetworkObserver {
 
-    private final BlockingQueue<Request> requests;
+    private final BlockingQueue<Runnable> tasks;
     private final List<ClientHandler> connectedClients;
     private final Map<String, GameController> games;
     private final Map<String, GameController> availableGames;
@@ -44,7 +43,7 @@ public class Lobby implements ServerNetworkObserver {
         games = new ConcurrentHashMap<>();
         availableGames = new ConcurrentHashMap<>();
         takenUsernames = ConcurrentHashMap.newKeySet();
-        requests = new LinkedBlockingQueue<>();
+        tasks = new LinkedBlockingQueue<>();
         executorService = Executors.newCachedThreadPool();
         lobbyRequestHandler = new LobbyRequestHandler(this);
         echo = false;
@@ -116,7 +115,7 @@ public class Lobby implements ServerNetworkObserver {
         System.out.println();
         while (running) {
             try {
-                lobbyRequestHandler.execute(requests.take());
+                tasks.take().run();
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 return;
@@ -133,9 +132,13 @@ public class Lobby implements ServerNetworkObserver {
      * @param client New client handler.
      */
     public void submitNewClient(ClientHandler client) {
-        enterLobby(client);
-        setRandomGuestUsername(client);
-        client.send(LobbyMessageGenerator.usernameSetMessage(client.getUsername()));
+        tasks.add(() -> {
+            enterLobby(client);
+            setRandomGuestUsername(client);
+            client.send(LobbyMessageGenerator.usernameSetMessage(client.getUsername()));
+            //only now can messages or a disconnect come in, and the client already has a name
+            client.start();
+        });
     }
 
     /**
@@ -159,7 +162,7 @@ public class Lobby implements ServerNetworkObserver {
      * @param request The new request.
      */
     public void submitNewRequest(Request request) {
-        requests.add(request);
+        tasks.add(() -> lobbyRequestHandler.execute(request));
     }
 
     /**
@@ -218,6 +221,7 @@ public class Lobby implements ServerNetworkObserver {
 
     /**
      * Creates a new game with the requested number of players and assign a name to it.
+     * The creator joins it straight away and gets the gameCreated confirmation from the game thread.
      * @param numberOfPlayers The number of players that will join.
      * @param gameName The name to identify the game.
      */
@@ -230,11 +234,8 @@ public class Lobby implements ServerNetworkObserver {
         GameController newGameController = new GameController(this,numberOfPlayers,gameName, echo);
         games.put(gameName, newGameController);
         availableGames.put(gameName,newGameController);
-        try {
-            joinGame(client, gameName);
-        } catch (NonExistentGameException | GameIsFullException ignored) {}
-        Thread thread = new Thread(newGameController);
-        thread.start();
+        newGameController.submitJoin(client, LobbyMessageGenerator.createdGameMessage());
+        executorService.submit(newGameController);
     }
 
     /**
@@ -255,52 +256,48 @@ public class Lobby implements ServerNetworkObserver {
     }
 
     /**
-     * Allows a client to join a game that is waiting for players.
+     * Allows a client to join a game that is waiting for players. The game itself answers
+     * with joinGame or gameIsFull once it has processed the request.
      * @param client The client that wants to join.
      * @param gameName The name of the game to join.
      * @throws NonExistentGameException Thrown when the given game name isn't the name of one of the available games to join.
      */
-    public void joinGame(ClientHandler client, String gameName) throws NonExistentGameException, GameIsFullException {
+    public void joinGame(ClientHandler client, String gameName) throws NonExistentGameException {
         GameController gameController = availableGames.get(gameName);
         if (gameController == null) { throw new NonExistentGameException(); }
-        gameController.enterGame(client);
+        gameController.submitJoin(client, LobbyMessageGenerator.joinGameMessage(gameName));
     }
 
     @Override
-    @SuppressWarnings("unchecked") //JSONObject.put is raw-typed in json-simple, nothing we can do about it here
     public void notifyConnectionLoss(ClientHandler clientHandler) {
         if (echo) {
             System.out.println("Client '" + clientHandler.getUsername() + "' lost connection");
         }
-        JSONObject message = new JSONObject();
-        message.put("command", "connectionLost");
-        submitNewRequest(new Request(clientHandler, message));
+        tasks.add(() -> leaveLobby(clientHandler));
     }
 
     /**
      * Stops the lobby execution, draining the client-handling thread pool before returning.
      * Does not terminate the JVM: the caller decides when to exit the process.
      */
-    @SuppressWarnings("unchecked") //JSONObject.put is raw-typed in json-simple, nothing we can do about it here
     public void shutdown() {
         running = false;
         if (serverWelcomeSocket != null) {
             serverWelcomeSocket.shutdown();
         }
         if (executorService != null) {
-            executorService.shutdown();
+            //games sit in tasks.take() and only stop on interrupt
+            executorService.shutdownNow();
             try {
                 boolean terminatedCleanly = executorService.awaitTermination(5, TimeUnit.SECONDS);
                 if (!terminatedCleanly) {
-                    System.out.println("Lobby shutdown: some client-handling tasks didn't finish within the timeout");
+                    System.out.println("Lobby shutdown: some games didn't stop within the timeout");
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
         }
-        //startLobby() is blocked on requests.take(): wake it up so it can observe running == false
-        JSONObject wakeUp = new JSONObject();
-        wakeUp.put("command", "shutdown");
-        requests.add(new Request(null, wakeUp));
+        //startLobby() is blocked on tasks.take(): wake it up so it can observe running == false
+        tasks.add(() -> {});
     }
 }

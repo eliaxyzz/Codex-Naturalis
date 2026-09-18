@@ -1,56 +1,31 @@
 package it.polimi.ingsw.network;
 
-import it.polimi.ingsw.network.ping.Pinger;
-import it.polimi.ingsw.network.input.NetworkInputHandler;
 import it.polimi.ingsw.server.controller.GameController;
 import it.polimi.ingsw.server.lobby.Lobby;
 import it.polimi.ingsw.util.supportclasses.Request;
 import org.json.simple.JSONObject;
-import java.io.IOException;
-import java.io.PrintWriter;
 import java.net.InetAddress;
 import java.net.Socket;
-import java.util.HashMap;
-import java.util.Map;
 
 /**
- * This class offers network functionalities for the server between the server and the client.
+ * Server side of a client connection. Requests go to the game the client is in, or to the lobby
+ * when it's in none. {@code game} is written by the lobby/game threads and read by the network
+ * reader, so it's volatile and read once per decision.
  */
-public class ClientHandler implements NetworkInterface {
-    private final PrintWriter out;
-    private final Socket socket;
-    private final NetworkInputHandler networkInputHandler;
-    private final Thread inputHandlerThread;
-    private final Pinger pinger;
-    private final Thread pingerThread;
-
-    private String username;
-    private GameController game = null;
+public class ClientHandler extends Connection {
     private final Lobby lobby;
-    private boolean isInGame;
+    private final InetAddress inetAddress;
+    private volatile String username;
+    private volatile GameController game;
 
     public ClientHandler(Socket socket, Lobby lobby) {
+        super(socket);
         this.lobby = lobby;
-        this.socket = socket;
-        try {
-            out= new PrintWriter(socket.getOutputStream(), true);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-
-        networkInputHandler = new NetworkInputHandler(this,socket);
-        inputHandlerThread = new Thread(networkInputHandler);
-        inputHandlerThread.start();
-
-        pinger = new Pinger(this);
-        pingerThread = new Thread(pinger);
-        pingerThread.start();
-
-        isInGame = false;
+        this.inetAddress = socket.getInetAddress();
     }
 
     public InetAddress getInetAddress() {
-        return socket.getInetAddress();
+        return inetAddress;
     }
 
     public String getUsername() {
@@ -61,6 +36,9 @@ public class ClientHandler implements NetworkInterface {
         this.username = username;
     }
 
+    /**
+     * @return the game this client is playing in, or null while it's in the lobby.
+     */
     public GameController getGameController() {
         return game;
     }
@@ -69,77 +47,23 @@ public class ClientHandler implements NetworkInterface {
         this.game = game;
     }
 
-    public void setInGame(boolean inGame) {
-        isInGame = inGame;
-    }
-
-    public boolean isInGame() {
-        return isInGame;
-    }
-
     @Override
-    public void send(JSONObject message) {
-        out.println(message.toJSONString());
-    }
-
-    @Override
-    public void notifyIncomingMessageFromSocket(JSONObject message) {
-        if(!networkMessageHandling(message)) {
-            if(isInGame) {
-                game.submitNewRequest(new Request(this, message));
-            }
-            else {
-                lobby.submitNewRequest(new Request(this, message));
-            }
+    protected void onMessage(JSONObject message) {
+        GameController current = game;
+        if (current != null) {
+            current.submitNewRequest(new Request(this, message));
+        } else {
+            lobby.submitNewRequest(new Request(this, message));
         }
     }
 
-    /**
-     * Handles messages that are not meant for the higher level, but they are service messages for the proper network functionality.
-     * @param message message to handle
-     * @return returns true if it was a service message, false if it's a message for the application
-     */
-    private boolean networkMessageHandling(JSONObject message) {
-        if(message.containsKey("type")) {
-            switch (message.get("type").toString()) {
-                case "pong" -> pinger.notifyPong();
-                case "ping" -> {
-                    Map<String,String> jsonMap = new HashMap<>();
-                    jsonMap.put("type", "pong");
-                    JSONObject pongMessage = new JSONObject(jsonMap);
-                    out.println(pongMessage);
-                }
-                default -> {
-                    return false;
-                }
-            }
-            return true;
-        }
-        return false;
-    }
-
     @Override
-    public void connectionLossNotification() {
-        if(isInGame) {
-            game.notifyConnectionLoss(this);
-        }
-        else {lobby.notifyConnectionLoss(this);}
-        shutdown();
-    }
-
-    /**
-     * Closes every service that was open and ends the connection.
-     */
-    public void shutdown() {
-        pinger.shutdown();
-        out.close();
-        networkInputHandler.shutdown();
-        inputHandlerThread.interrupt();
-        pingerThread.interrupt();
-        try {
-            socket.close();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+    protected void onConnectionLost() {
+        GameController current = game;
+        if (current != null) {
+            current.notifyConnectionLoss(this);
+        } else {
+            lobby.notifyConnectionLoss(this);
         }
     }
 }

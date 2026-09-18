@@ -116,7 +116,8 @@ public class ServerView {
             for (ClientHandler client : lobby.getConnectedClients()) {
                 System.out.println(client.getUsername());
                 System.out.println(client.getInetAddress());
-                if (client.isInGame()) System.out.println("Playing in '" + client.getGameController().getGameName() + "'");
+                GameController game = client.getGameController();
+                if (game != null) System.out.println("Playing in '" + game.getGameName() + "'");
                 else System.out.println("In the lobby");
                 System.out.println();
             }

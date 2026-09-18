@@ -82,5 +82,23 @@ class GameFlowTest {
         second.close();
         // a closed socket is an EOF on the server side, no need to wait for the pinger to give up
         assertNotNull(first.await("closingGame", 1500));
+        assertEquals(0, first.countWithin("closingGame", 500), "closingGame must be broadcast once");
+    }
+
+    @Test
+    void droppedClientIsForgottenByTheLobby() throws Exception {
+        second.close();
+        first.await("closingGame", 1500);
+        long deadline = System.currentTimeMillis() + 2000;
+        while (server.lobby().getConnectedClients().size() != 1 && System.currentTimeMillis() < deadline) {
+            Thread.sleep(20);
+        }
+        assertEquals(1, server.lobby().getConnectedClients().size());
+    }
+
+    @Test
+    void clientsCannotFakeServerSideEvents() throws Exception {
+        first.send("connectionLost");
+        assertEquals(0, second.countWithin("closingGame", 500));
     }
 }

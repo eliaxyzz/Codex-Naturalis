@@ -2,49 +2,45 @@ package it.polimi.ingsw.network.ping;
 
 import it.polimi.ingsw.network.NetworkInterface;
 import org.json.simple.JSONObject;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import static it.polimi.ingsw.util.supportclasses.Constants.*;
 
 /**
  * This class has the role to ping the other host to ensure the connection is still alive.
+ * The counter is reset by the reader thread on every pong and decremented here, hence atomic.
  */
 public class Pinger implements Runnable, PongObserver {
-    private final NetworkInterface networkInterface;
-    private volatile boolean running;
-    private final JSONObject pingMessage;
+    private static final JSONObject PING = new JSONObject(Map.of("type", "ping"));
 
-    private final int pingTries = PING_TRIES;
-    int remainingPings;
+    private final NetworkInterface networkInterface;
+    private final AtomicInteger remainingPings = new AtomicInteger(PING_TRIES);
+    private volatile boolean running;
 
     public Pinger(NetworkInterface networkInterface) {
         this.networkInterface = networkInterface;
-        Map<String,String> jsonMap = new HashMap<>();
-        jsonMap.put("type", "ping");
-        pingMessage = new JSONObject(jsonMap);
         running = true;
     }
 
     @Override
-    @SuppressWarnings("all")
     public void run() {
-        remainingPings = pingTries;
         while (running) {
-            networkInterface.send(pingMessage);
+            networkInterface.send(PING);
             try {
                 Thread.sleep(PING_INTERVAL);
-            } catch (InterruptedException ignored) {
+            } catch (InterruptedException e) {
+                return; //only happens on shutdown
             }
-            remainingPings -= 1;
-            if (remainingPings == 0) {
-                networkInterface.connectionLossNotification();
+            if (running && remainingPings.decrementAndGet() <= 0) {
                 running = false;
+                networkInterface.connectionLossNotification();
             }
         }
     }
 
-    public synchronized void notifyPong() {
-        remainingPings = pingTries;
+    @Override
+    public void notifyPong() {
+        remainingPings.set(PING_TRIES);
     }
 
     /**

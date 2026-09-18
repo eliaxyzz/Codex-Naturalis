@@ -2,6 +2,7 @@ package it.polimi.ingsw.server.controller;
 
 import it.polimi.ingsw.network.ClientHandler;
 import it.polimi.ingsw.server.lobby.Lobby;
+import it.polimi.ingsw.server.lobby.LobbyMessageGenerator;
 import it.polimi.ingsw.network.ServerNetworkObserver;
 import it.polimi.ingsw.server.model.Game;
 import it.polimi.ingsw.server.model.Player;
@@ -21,17 +22,18 @@ import static it.polimi.ingsw.util.supportclasses.Constants.SCORE_GOAL;
 /**
  * This class manages the logic of a game instance. It acts as the central controller
  *  for the game, coordinating interactions between players, the game model and the server network.
- * clientHandlers is a CopyOnWriteArrayList because it's written from the lobby's thread
- * (a player joining) while this game's own thread reads it constantly (broadcast, turn checks).
+ * Every change to the game happens on the game's own thread: network requests, joins and
+ * disconnects all arrive as tasks on {@code tasks}. clientHandlers is still a CopyOnWriteArrayList
+ * because the lobby and the server console read it (player counts, game info) from their threads.
  */
 public class GameController implements Runnable, ServerNetworkObserver, GameObserver {
     private final String gameName;
     private final List<ClientHandler> clientHandlers;
     private final Lobby lobby;
     private final Game game;
-    private final BlockingQueue<Request> requests;
+    private final BlockingQueue<Runnable> tasks;
     private boolean echo;
-    private boolean running;
+    private volatile boolean running;
     private final GameRequestHandler gameRequestHandler;
     private final ServerMessageGenerator messageGenerator;
 
@@ -39,7 +41,7 @@ public class GameController implements Runnable, ServerNetworkObserver, GameObse
         this.gameName = gameName;
         this.clientHandlers = new CopyOnWriteArrayList<>();
         this.lobby = lobby;
-        this.requests = new LinkedBlockingQueue<>();
+        this.tasks = new LinkedBlockingQueue<>();
         this.echo = echo;
         running = true;
         this.game = new Game(numberOfPlayers);
@@ -55,7 +57,7 @@ public class GameController implements Runnable, ServerNetworkObserver, GameObse
     public void run() {
         while (running) {
             try {
-                gameRequestHandler.execute(requests.take());
+                tasks.take().run();
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 return;
@@ -80,7 +82,17 @@ public class GameController implements Runnable, ServerNetworkObserver, GameObse
 
     @Override
     public void submitNewRequest(Request request) {
-        requests.add(request);
+        tasks.add(() -> gameRequestHandler.execute(request));
+    }
+
+    /**
+     * Queues a join. The outcome is sent to the client from the game thread: {@code confirmation}
+     * if it got in, gameIsFull otherwise.
+     * @param client The client that wants to join.
+     * @param confirmation The message to send once the client is in.
+     */
+    public void submitJoin(ClientHandler client, JSONObject confirmation) {
+        tasks.add(() -> enterGame(client, confirmation));
     }
 
     public Game getGame() {
@@ -95,37 +107,48 @@ public class GameController implements Runnable, ServerNetworkObserver, GameObse
         return game.getNumberOfPlayers();
     }
 
-    /**
-     * Adds the player to the arraylist of players.
-     * @param client Client who joined the current game.
-     */
-    public synchronized void enterGame (ClientHandler client) throws GameIsFullException {
-        if(gameIsFull()) {
-            throw new GameIsFullException();
+    private void enterGame(ClientHandler client, JSONObject confirmation) {
+        if (gameIsFull() || game.getGameState() != GameState.waitingForPlayers) {
+            client.send(LobbyMessageGenerator.gameIsFullMessage());
+            return;
+        }
+        //route the client here before checking it's still connected: a disconnect racing with
+        //this join then either sees the new route and comes to us, or we see it closed and back off
+        client.setGame(this);
+        if (client.isClosed()) {
+            client.setGame(null);
+            return;
         }
         clientHandlers.add(client);
-        client.setGame(this);
-        client.setInGame(true);
         game.getPlayersHashMap().put(client.getUsername(), new Player(game));
+        client.send(confirmation);
         if (echo) {
             System.out.println("Player '" + client.getUsername() + "' joined the game '" + gameName +"'");
         }
     }
 
     /**
-     * Removes a player from the current game and sends him to the lobby.
+     * The player chose to leave: back to the lobby they go.
      * @param client Client who left the game.
      */
-    public synchronized void leaveGame (ClientHandler client){
-        clientHandlers.remove(client);
+    public void leaveGame(ClientHandler client) {
+        removePlayer(client);
+        lobby.enterLobby(client);
+    }
+
+    /**
+     * Takes the player out of the game and, if the game was under way, closes it for everyone else.
+     * Does nothing if the client isn't (or is no longer) in this game.
+     */
+    private void removePlayer(ClientHandler client) {
+        if (!clientHandlers.contains(client)) return;
         game.reinsertToken(getCurrentPlayer(client).getToken());
         game.getPlayersHashMap().remove(client.getUsername());
+        clientHandlers.remove(client);
         client.setGame(null);
-        client.setInGame(false);
         if (echo) {
             System.out.println("Player '" + client.getUsername() + "' left the game '" + gameName +"'");
         }
-        lobby.enterLobby(client);
         if(game.getGameState() == GameState.waitingForCardsSelection || game.getGameState() == GameState.playing || game.getGameState() == GameState.lastRound) {
             disconnectionDuringGameProcedure();
         }
@@ -224,7 +247,7 @@ public class GameController implements Runnable, ServerNetworkObserver, GameObse
      * Sets the flag ready to true when the player is ready to play.
      * @param player The player that is now ready.
      */
-    public synchronized void ready(ClientHandler player){
+    public void ready(ClientHandler player){
         getCurrentPlayer(player).setReady(true);
         if(echo) System.out.println("In game '" + gameName + "' player '" + player.getUsername() + "' is ready");
         notifyReady();
@@ -450,27 +473,20 @@ public class GameController implements Runnable, ServerNetworkObserver, GameObse
     }
 
     @Override
-    @SuppressWarnings("unchecked") //JSONObject.put is raw-typed in json-simple, nothing we can do about it here
     public void notifyConnectionLoss (ClientHandler client) {
         if (echo) {
             System.out.println("In game '" + gameName + "' player '" + client.getUsername() + "' disconnected");
         }
-        JSONObject message = new JSONObject();
-        message.put("command", "connectionLost");
-        submitNewRequest(new Request(client, message));
+        tasks.add(() -> handleConnectionLoss(client));
     }
 
     /**
-     * Runs the disconnection cleanup on the game's single request-processing thread,
-     * so it never races with a command being handled for another player.
-     * @param client The client that lost connection.
+     * Runs on the game thread, so it never races with a command being handled for another player.
+     * The lobby still has to forget the client (username, connected list) once it's out of the game.
      */
-    void handleConnectionLoss(ClientHandler client) {
-        leaveGame(client);
+    private void handleConnectionLoss(ClientHandler client) {
+        removePlayer(client);
         lobby.notifyConnectionLoss(client);
-        if(!(game.getGameState() == GameState.endGame || game.getGameState() == GameState.waitingForPlayers)) {
-            disconnectionDuringGameProcedure();
-        }
     }
 
     private boolean gameIsFull() {

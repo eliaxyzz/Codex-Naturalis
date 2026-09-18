@@ -34,7 +34,6 @@ public class GameRequestHandler {
         commands.put("drawRightGoldCard", (client, message) -> drawRightRevealedGoldCard(client));
         commands.put("place", this::place);
         commands.put("leave", (client, message) -> leave(client));
-        commands.put("connectionLost", (client, message) -> gameController.handleConnectionLoss(client));
     }
 
     /**
@@ -63,7 +62,7 @@ public class GameRequestHandler {
             }
         }
         if(game.getGameState() == GameState.endGame || game.getGameState() == GameState.aClientDisconnected) {
-            if(!command.equals("leave") && !command.equals("connectionLost")) {
+            if(!command.equals("leave")) {
                 return;
             }
         }

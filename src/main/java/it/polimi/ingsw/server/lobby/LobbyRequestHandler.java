@@ -3,7 +3,6 @@ package it.polimi.ingsw.server.lobby;
 import it.polimi.ingsw.network.ClientHandler;
 import it.polimi.ingsw.util.customexceptions.AlreadyTakenUsernameException;
 import it.polimi.ingsw.util.customexceptions.CannotCreateGameException;
-import it.polimi.ingsw.util.customexceptions.GameIsFullException;
 import it.polimi.ingsw.util.customexceptions.InvalidMessageException;
 import it.polimi.ingsw.util.customexceptions.NonExistentGameException;
 import it.polimi.ingsw.util.supportclasses.Request;
@@ -27,7 +26,6 @@ public class LobbyRequestHandler {
         commands.put("setUp", (client, message) -> setUpGame(message, client));
         commands.put("join", (client, message) -> joinGame(message, client));
         commands.put("leave", (client, message) -> leaveLobby(client));
-        commands.put("connectionLost", (client, message) -> leaveLobby(client));
     }
     /**
      * Handles the incoming request from a client
@@ -86,7 +84,6 @@ public class LobbyRequestHandler {
 
         try {
             lobby.setupNewGame(numberOfPlayers,gameName,clientHandler);
-            clientHandler.send(LobbyMessageGenerator.createdGameMessage());
         } catch (CannotCreateGameException e) {
             clientHandler.send(LobbyMessageGenerator.cannotCreateGameMessage(e.getMessage()));
         }
@@ -101,11 +98,8 @@ public class LobbyRequestHandler {
         String gameName = RequestFields.getString(message, "gameName");
         try {
             lobby.joinGame(clientHandler,gameName);
-            clientHandler.send(LobbyMessageGenerator.joinGameMessage(gameName));
         } catch (NonExistentGameException e) {
             clientHandler.send(LobbyMessageGenerator.gameDoesNotExistMessage());
-        } catch (GameIsFullException e) {
-            clientHandler.send(LobbyMessageGenerator.gameIsFullMessage());
         }
 
     }
