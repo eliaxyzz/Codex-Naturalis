@@ -24,6 +24,10 @@ public abstract class TerminalInputReader implements Runnable {
                 //stdin is closed (EOF or shutdown): there's nothing left to read, and retrying would spin forever
                 running = false;
             }
+            catch (RuntimeException e) {
+                //a command that blows up shouldn't take the whole console with it
+                System.out.println("Something went wrong running that command: " + e);
+            }
         }
     }
 

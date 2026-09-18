@@ -9,13 +9,50 @@ import it.polimi.ingsw.client.view.utility.CardRepresentation;
 import it.polimi.ingsw.util.cli.CommandParser;
 import it.polimi.ingsw.util.supportclasses.ClientState;
 import it.polimi.ingsw.util.supportclasses.ConsoleColor;
-import java.util.ArrayList;
-import java.util.Objects;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Consumer;
 
 /**
  * This class is responsible for parsing user commands entered the Codex game client's CLI.
+ * Each command (and its short alias) maps to a handler that receives the whitespace-split tokens.
  */
 public class ClientTerminalParser implements CommandParser {
+    private static final Set<ClientState> IN_GAME = EnumSet.of(ClientState.PLACING_STATE, ClientState.DRAWING_STATE,
+            ClientState.NOT_PLAYING_STATE, ClientState.LAST_ROUND_STATE);
+
+    private final Map<String, Consumer<String[]>> commands = new HashMap<>();
+
+    public ClientTerminalParser() {
+        register(tokens -> Printer.printHelp(), "help", "h", "?");
+        register(this::updateUsername, "setusername", "su");
+        register(tokens -> ClientController.getInstance().sendLeaveMessage(), "leave", "l");
+        register(tokens -> ClientCLI.getInstance().shutdown(), "quit", "q");
+        register(this::createGame, "create", "c");
+        register(this::getAvailableGames, "availablegames", "ag");
+        register(this::getInfo, "info");
+        register(this::joinGame, "join", "j");
+        register(this::setReady, "ready", "r");
+        register(this::selectStarterCardOrientation, "startercard", "sc");
+        register(this::selectSecretObjective, "secretobjective", "so");
+        register(this::place, "place", "p");
+        register(this::draw, "draw", "d");
+        register(inGameOnly(Printer::printGameBoard), "board");
+        register(inGameOnly(Printer::printHand), "hand");
+        register(inGameOnly(Printer::printScores), "score");
+        register(inGameOnly(Printer::printObjectives), "objectives", "obj");
+        register(inGameOnly(Printer::printDeckInfo), "decks");
+        register(tokens -> Printer.printGuide(), "guide");
+    }
+
+    private void register(Consumer<String[]> handler, String... names) {
+        for (String name : names) {
+            commands.put(name, handler);
+        }
+    }
 
     /**
      * Parses a user command entered the CLI.
@@ -23,449 +60,247 @@ public class ClientTerminalParser implements CommandParser {
      */
     @Override
     public void parse(String command) {
-        String[] tokens = command.split("\\s+");
-        tokens[0] = tokens[0].toLowerCase();
-        switch (tokens[0]) {
-            case "help","h","?" -> Printer.printHelp();
-            case "setusername","su" -> updateUsername(tokens);
-            case "leave", "l" -> leave();
-            case "quit", "q" -> ClientCLI.getInstance().shutdown();
-            case "create", "c" -> createGame(tokens);
-            case "availablegames", "ag" -> getAvailableGames();
-            case "info" -> getInfo(tokens);
-            case "join", "j" -> joinGame(tokens);
-            case "ready", "r" -> setReady();
-            case "startercard","sc" -> selectStarterCardOrientation(tokens);
-            case "secretobjective", "so" -> selectSecretObjective(tokens);
-            case "place", "p" -> place(tokens);
-            case "draw", "d" -> draw(tokens);
-            case "board" -> showBoard();
-            case "hand" -> showHand();
-            case "score" -> showScore();
-            case "objectives","obj" -> showObjectives();
-            case "guide" -> showGuide();
-            case "decks" -> showDecks();
-            default -> {
-                System.out.println("Unknown command");
-                System.out.println("Type 'help' for more information.");
-                System.out.println();
-            }
+        String[] tokens = command.trim().split("\\s+");
+        Consumer<String[]> handler = commands.get(tokens[0].toLowerCase());
+        if (handler == null) {
+            System.out.println("Unknown command");
+            System.out.println("Type 'help' for more information.");
+            System.out.println();
+            return;
         }
+        handler.accept(tokens);
     }
 
-    /**
-     * Sends an error message to the client when the received command is invalid.
-     * @param messageError Message containing the reason of the failure.
-     */
     private void parseError(String messageError) {
         System.out.println("Unexpected arguments: " + messageError);
         System.out.println();
     }
 
-    /**
-     * Sends an error message to the client when the received command is invalid.
-     */
     private void parseError() {
         System.out.println("Unexpected arguments");
         System.out.println();
     }
 
+    private void unexpected(String reason) {
+        System.out.println("Unexpected command");
+        System.out.println(reason);
+        System.out.println();
+    }
+
+    private ClientState state() {
+        return ClientStateModel.getInstance().getClientState();
+    }
+
     /**
-     * Parses the setUsername command required by the client.
-     * @param tokens array of strings containing the parameters needed to execute the command.
+     * @return the parsed number, or null after telling the user what was wrong with it.
      */
+    private Integer parseNumber(String token, String whatItIs) {
+        try {
+            return Integer.parseInt(token.trim());
+        } catch (NumberFormatException e) {
+            parseError("invalid " + whatItIs);
+            return null;
+        }
+    }
+
+    private boolean requireLobby() {
+        if (state() == ClientState.LOBBY_STATE) return true;
+        unexpected("You're not in the lobby");
+        return false;
+    }
+
+    private boolean requireGameSetup() {
+        if (state() == ClientState.GAME_SETUP_STATE) return true;
+        unexpected("You're not in a game");
+        return false;
+    }
+
+    private Consumer<String[]> inGameOnly(Runnable action) {
+        return tokens -> {
+            if (IN_GAME.contains(state())) action.run();
+            else unexpected("you're not in a game");
+        };
+    }
+
     private void updateUsername(String[] tokens) {
-        if (ClientStateModel.getInstance().getClientState() == ClientState.LOBBY_STATE) {
-            if(tokens.length == 2) {
-                String username = tokens[1].trim();
-                if (username.matches("^[a-zA-Z0-9_]*$")) {
-                    ClientController.getInstance().sendSetUsernameMessage(username);
-                } else if (username.length() > 15) {
-                    Printer.printMessage("The username must be less than 15 characters", ConsoleColor.RED);
-                } else
-                    parseError("invalid username");
-            }
-            else {
-                parseError();
-            }
+        if (!requireLobby()) return;
+        if (tokens.length != 2) {
+            parseError();
+            return;
         }
-        else {
-            System.out.println("Unexpected command");
-            System.out.println("You're not in the lobby");
-            System.out.println();
+        String username = tokens[1].trim();
+        if (username.length() > 15) {
+            Printer.printMessage("The username must be less than 15 characters", ConsoleColor.RED);
+        } else if (!username.matches("^[a-zA-Z0-9_]*$")) {
+            parseError("invalid username");
+        } else {
+            ClientController.getInstance().sendSetUsernameMessage(username);
         }
     }
 
-    /**
-     * Parses the createGame command required by the client.
-     * @param tokens Array of strings containing the parameters needed to execute the command.
-     */
     private void createGame(String[] tokens) {
-        if (ClientStateModel.getInstance().getClientState() == ClientState.LOBBY_STATE) {
-            if (tokens.length==3) {
-                String gameName = tokens[1].trim();
-                int numberOfPlayers = 0;
-                try {
-                    numberOfPlayers = Integer.parseInt(tokens[2].trim());
-                } catch (NumberFormatException e) {
-                    parseError("invalid number of players");
-                }
-                if(numberOfPlayers>=2 && numberOfPlayers<=4) {
-                    ClientController.getInstance().sendSetUpGameMessage(gameName, numberOfPlayers);
-                }
-                else {
-                    parseError("number of players must be between 2 and 4");
-                }
-            }
-            else {
-                parseError();
-            }
+        if (!requireLobby()) return;
+        if (tokens.length != 3) {
+            parseError();
+            return;
         }
-        else {
-            System.out.println("Unexpected command");
-            System.out.println("You're not in the lobby");
-            System.out.println();
+        Integer numberOfPlayers = parseNumber(tokens[2], "number of players");
+        if (numberOfPlayers == null) return;
+        if (numberOfPlayers < 2 || numberOfPlayers > 4) {
+            parseError("number of players must be between 2 and 4");
+            return;
         }
+        ClientController.getInstance().sendSetUpGameMessage(tokens[1].trim(), numberOfPlayers);
     }
 
-    /**
-     * Parses the getAvailableGames required by the client and shows him all the possible games he can join.
-     */
-    private void getAvailableGames () {
-        if (ClientStateModel.getInstance().getClientState() == ClientState.LOBBY_STATE)
-            ClientController.getInstance().sendGetAvailableGamesMessage();
-        else {
-            System.out.println("Unexpected command");
-            System.out.println("You're not in the lobby");
-            System.out.println();
-        }
+    private void getAvailableGames(String[] tokens) {
+        if (requireLobby()) ClientController.getInstance().sendGetAvailableGamesMessage();
     }
 
-    /**
-     * Parses the joinGame command required by the client.
-     * @param tokens Array of strings containing the parameters needed to execute the command.
-     */
     private void joinGame(String[] tokens) {
-
-        if (ClientStateModel.getInstance().getClientState() == ClientState.LOBBY_STATE) {
-            if (tokens.length == 2) {
-                ClientController.getInstance().sendJoinGameMessage(tokens[1]);
-            }
-            else parseError();
-        }
-        else {
-            System.out.println("Unexpected command");
-            System.out.println("You're not in the lobby");
-            System.out.println();
-        }
+        if (!requireLobby()) return;
+        if (tokens.length == 2) ClientController.getInstance().sendJoinGameMessage(tokens[1]);
+        else parseError();
     }
 
-    /**
-     * Parses the setReady command required by the client.
-     */
-    private void setReady() {
-        if (ClientStateModel.getInstance().getClientState() == ClientState.GAME_SETUP_STATE) {
-            Printer.printMessage("You are ready! - waiting for all the players to get ready...");
-            ClientController.getInstance().sendReadyMessage();
-        }
-        else {
-            System.out.println("Unexpected command");
-            System.out.println("You're not in a game");
-            System.out.println();
-        }
+    private void setReady(String[] tokens) {
+        if (!requireGameSetup()) return;
+        Printer.printMessage("You are ready! - waiting for all the players to get ready...");
+        ClientController.getInstance().sendReadyMessage();
     }
 
-    /**
-     * Parses the selectStarterCardOrientation command required by the client.
-     * @param tokens Array of strings containing the parameters needed to execute the command.
-     */
     private void selectStarterCardOrientation(String[] tokens) {
-        if (ClientStateModel.getInstance().getClientState() == ClientState.GAME_SETUP_STATE) {
-            int starterCardID = SelectableCardsModel.getInstance().getStarterCardId();
-            if (tokens.length == 2) {
-                if(Objects.equals(tokens[1], "front")) {
-                    ClientController.getInstance().sendChosenStarterCardSideMessage(starterCardID, true);
-                }
-                else if(Objects.equals(tokens[1], "back")) {
-                    ClientController.getInstance().sendChosenStarterCardSideMessage(starterCardID, false);
-                }
-                else parseError("invalid parameters");
-            }
-            else {
-                parseError();
-            }
+        if (!requireGameSetup()) return;
+        if (tokens.length != 2) {
+            parseError();
+            return;
         }
-        else {
-            System.out.println("Unexpected command");
-            System.out.println("You're not in a game");
-            System.out.println();
+        int starterCardID = SelectableCardsModel.getInstance().getStarterCardId();
+        switch (tokens[1]) {
+            case "front" -> ClientController.getInstance().sendChosenStarterCardSideMessage(starterCardID, true);
+            case "back" -> ClientController.getInstance().sendChosenStarterCardSideMessage(starterCardID, false);
+            default -> parseError("invalid parameters");
+        }
+    }
+
+    private void selectSecretObjective(String[] tokens) {
+        if (!requireGameSetup()) return;
+        if (tokens.length != 2) {
+            parseError();
+            return;
+        }
+        Integer objectiveId = parseNumber(tokens[1], "objective card id");
+        if (objectiveId == null) return;
+        int[] offered = SelectableCardsModel.getInstance().getSelectableObjectiveCardsId();
+        if (objectiveId == offered[0] || objectiveId == offered[1]) {
+            ClientController.getInstance().sendChosenSecretObjectiveMessage(objectiveId);
+        } else {
+            parseError("This ID is not valid");
         }
     }
 
     /**
-     * Parses the selectSecreteObjective command required by the client.
-     * @param tokens Array of strings containing the parameters needed to execute the command.
-     */
-    private void selectSecretObjective (String[] tokens) {
-        if (ClientStateModel.getInstance().getClientState() == ClientState.GAME_SETUP_STATE) {
-            if (tokens.length == 2) {
-                SelectableCardsModel selectableCardsModel = SelectableCardsModel.getInstance();
-                int objectiveId = 0;
-                try {
-                    objectiveId = Integer.parseInt(tokens[1]);
-                } catch (NumberFormatException e) {
-                    parseError("invalid objective card id");
-                }
-                if(objectiveId == selectableCardsModel.getSelectableObjectiveCardsId()[0] || objectiveId == selectableCardsModel.getSelectableObjectiveCardsId()[1]) {
-                    ClientController.getInstance().sendChosenSecretObjectiveMessage(objectiveId);
-                }
-                else {
-                    parseError("This ID is not valid");
-                }
-            }
-            else {
-                parseError("Unexpected arguments");
-            }
-        }
-        else {
-            System.out.println("Unexpected command");
-            System.out.println("you're not in a game");
-            System.out.println();
-        }
-    }
-
-    /**
-     * Handles the "place" command for placing cards in the game.
-     * @param tokens The tokens parsed from the user command.
+     * place &lt;card id&gt; &lt;front|back&gt; &lt;target card id&gt; &lt;tl|tr|bl|br&gt;
      */
     private void place(String[] tokens) {
-
-        if (ClientStateModel.getInstance().getClientState() == ClientState.PLACING_STATE) {
-            if (tokens.length == 5) {
-                int cardId = 0;
-                int targetId = 0;
-                try {
-                    cardId = Integer.parseInt(tokens[1]);
-                    targetId = Integer.parseInt(tokens[3]);
-                } catch (NumberFormatException e) {
-                    parseError();
-                }
-                try {
-                    searchCardId(HandModel.getInstance().getCardsInHand(), cardId);
-                } catch (RuntimeException e) {
-                    parseError("You don't have the #" + cardId + " card in your hand");
-                    return;
-                }
-                boolean facingUp = false;
-                if(tokens[2].equals("front")) facingUp = true;
-                else if(!tokens[2].equals("back")) {
-                    parseError();
-                    return;
-                }
-                CardRepresentation targetCard;
-                try {
-                    targetCard = searchCardId(GameFieldModel.getInstance().getPlacementHistory(), targetId);
-                } catch (RuntimeException e) {
-                    parseError("the target card is not on your field");
-                    return;
-                }
-                int x;
-                int y;
-                switch (tokens[4]) {
-                    case "topleft", "tl" -> {
-                        x = targetCard.getX() - 1;
-                        y = targetCard.getY() + 1;
-                    }
-                    case "topright", "tr" -> {
-                        x = targetCard.getX() + 1;
-                        y = targetCard.getY() + 1;
-                    }
-                    case "bottomleft", "bl" -> {
-                        x = targetCard.getX() - 1;
-                        y = targetCard.getY() - 1;
-                    }
-                    case "bottomright", "br" -> {
-                        x = targetCard.getX() + 1;
-                        y = targetCard.getY() -1;
-                    }
-                    default -> {
-                        parseError("the position argument is not correct");
-                        return;
-                    }
-                }
-
-                ClientController.getInstance().sendPlaceMessage(cardId,x,y,facingUp);
-            }
-            else {
+        if (state() != ClientState.PLACING_STATE) {
+            unexpected(switch (state()) {
+                case NOT_PLAYING_STATE -> "Not your turn";
+                case DRAWING_STATE -> "You have already placed, draw a card";
+                default -> "You're not playing right now";
+            });
+            return;
+        }
+        if (tokens.length != 5) {
+            parseError();
+            return;
+        }
+        Integer cardId = parseNumber(tokens[1], "card id");
+        Integer targetId = parseNumber(tokens[3], "target card id");
+        if (cardId == null || targetId == null) return;
+        if (findCard(HandModel.getInstance().getCardsInHand(), cardId) == null) {
+            parseError("You don't have the #" + cardId + " card in your hand");
+            return;
+        }
+        boolean facingUp;
+        switch (tokens[2]) {
+            case "front" -> facingUp = true;
+            case "back" -> facingUp = false;
+            default -> {
                 parseError();
-
+                return;
             }
         }
-        else {
-            System.out.println("Unexpected command");
-
-            if (ClientStateModel.getInstance().getClientState() == ClientState.NOT_PLAYING_STATE) {
-                System.out.println("Not your turn");
-            } else if (ClientStateModel.getInstance().getClientState() == ClientState.DRAWING_STATE) {
-                System.out.println("You have already placed, draw a card");
-            }
-            else System.out.println("You're not playing right now");
-            System.out.println();
+        CardRepresentation target = findCard(GameFieldModel.getInstance().getPlacementHistory(), targetId);
+        if (target == null) {
+            parseError("the target card is not on your field");
+            return;
         }
+        int[] offset = switch (tokens[4]) {
+            case "topleft", "tl" -> new int[]{-1, 1};
+            case "topright", "tr" -> new int[]{1, 1};
+            case "bottomleft", "bl" -> new int[]{-1, -1};
+            case "bottomright", "br" -> new int[]{1, -1};
+            default -> null;
+        };
+        if (offset == null) {
+            parseError("the position argument is not correct");
+            return;
+        }
+        ClientController.getInstance().sendPlaceMessage(cardId, target.getX() + offset[0], target.getY() + offset[1], facingUp);
+    }
+
+    private CardRepresentation findCard(List<CardRepresentation> cards, int id) {
+        for (CardRepresentation card : cards) {
+            if (card.getId() == id) return card;
+        }
+        return null;
     }
 
     /**
-     * Searches for a card with a specific ID within a list of card representations.
-     * @param cards The list of card representations to search.
-     * @param searchedId The ID of the card to search for.
-     * @return The `CardRepresentation` object if the card is found, otherwise throws a `RuntimeException`.
-     * @throws RuntimeException If no card with the specified ID is found in the list.
-     */
-    private CardRepresentation searchCardId(ArrayList<CardRepresentation> cards, int searchedId) throws RuntimeException {
-        for(CardRepresentation card : cards) {
-            if(card.getId() == searchedId) {
-                return card;
-            }
-        }
-        throw new RuntimeException();
-    }
-
-    /**
-     * Parses the draw command received by the client.
-     * @param tokens array of strings containing the parameters needed to execute the command.
+     * draw &lt;1-6&gt;: resource deck, left resource, right resource, gold deck, left gold, right gold.
      */
     private void draw(String[] tokens) {
-
-        if (tokens.length == 2 && ClientStateModel.getInstance().getClientState() == ClientState.DRAWING_STATE) {
-            String selection = tokens[1];
-            switch (selection) {
-                case "1" -> ClientController.getInstance().sendDirectDrawResourceCardMessage();
-                case "2" -> ClientController.getInstance().sendDrawLeftResourceCardMessage();
-                case "3" -> ClientController.getInstance().sendDrawRightResourceCardMessage();
-                case "4" -> ClientController.getInstance().sendDirectDrawGoldCardMessage();
-                case "5" -> ClientController.getInstance().sendDrawLeftGoldCardMessage();
-                case "6" -> ClientController.getInstance().sendDrawRightGoldCardMessage();
-                default -> parseError("the deck selection must be between 1 and 6");
-            }
+        if (state() != ClientState.DRAWING_STATE) {
+            unexpected(switch (state()) {
+                case NOT_PLAYING_STATE -> "Not your turn";
+                case PLACING_STATE -> "You have to place a card first";
+                default -> "You're not playing right now";
+            });
+            return;
         }
-        else {
-            System.out.println("Unexpected command");
-
-            if (ClientStateModel.getInstance().getClientState() == ClientState.NOT_PLAYING_STATE) {
-                System.out.println("Not your turn");
-            } else if (ClientStateModel.getInstance().getClientState() == ClientState.PLACING_STATE) {
-                System.out.println("You have to place a card first");
-            }
-            else System.out.println("You're not playing right now");
-            System.out.println();
+        if (tokens.length != 2) {
+            parseError();
+            return;
+        }
+        ClientController controller = ClientController.getInstance();
+        switch (tokens[1]) {
+            case "1" -> controller.sendDirectDrawResourceCardMessage();
+            case "2" -> controller.sendDrawLeftResourceCardMessage();
+            case "3" -> controller.sendDrawRightResourceCardMessage();
+            case "4" -> controller.sendDirectDrawGoldCardMessage();
+            case "5" -> controller.sendDrawLeftGoldCardMessage();
+            case "6" -> controller.sendDrawRightGoldCardMessage();
+            default -> parseError("the deck selection must be between 1 and 6");
         }
     }
 
     /**
-     * Parses the leave command required by the client.
+     * info &lt;card id&gt; [front|back]
      */
-    private void leave() {
-        ClientController.getInstance().sendLeaveMessage();
-    }
-
-    /**
-     * Parses the getInfo command required by the client.
-     * @param tokens array of strings containing the parameters needed to execute the command.
-     */
-    private void getInfo (String[] tokens) {
-        int id = 0;
-        try {
-            id = Integer.parseInt(tokens[1]);
-        } catch (NumberFormatException e) {
-            parseError("invalid id");
+    private void getInfo(String[] tokens) {
+        if (tokens.length < 2 || tokens.length > 3) {
+            System.out.println("Error: Invalid number of arguments");
+            return;
         }
-        if (tokens.length == 2) {
-            Printer.printCardInfo(id,true);
+        Integer id = parseNumber(tokens[1], "id");
+        if (id == null) return;
+        if (tokens.length == 2 || tokens[2].equals("front")) {
+            Printer.printCardInfo(id, true);
+        } else if (tokens[2].equals("back")) {
+            Printer.printCardInfo(id, false);
+        } else {
+            parseError("the side must be front or back");
         }
-        else if (tokens.length == 3) {
-            String side = tokens[2];
-            if (Objects.equals(side, "front")){
-                Printer.printCardInfo(id, true);
-            }
-            else if (Objects.equals(side, "back")){
-                Printer.printCardInfo(id, false);
-            }
-
-        }
-        else System.out.println("Error: Invalid number of arguments");
-    }
-
-    /**
-     * Parses the showBoard command required by the client.
-     */
-    private void showBoard() {
-        if (isNotInGame()) {
-            System.out.println("Unexpected command");
-            System.out.println("you're not in a game");
-            System.out.println();
-        }
-        else Printer.printGameBoard();
-    }
-
-    /**
-     * Parses the showHand command required by the client.
-     */
-    private void showHand () {
-        if (isNotInGame()) {
-            System.out.println("Unexpected command");
-            System.out.println("you're not in a game");
-            System.out.println();
-        }
-        else Printer.printHand();
-    }
-
-    /**
-     * Parses the showScore command required by the client.
-     */
-    private void showScore () {
-        if (isNotInGame()) {
-            System.out.println("Unexpected command");
-            System.out.println("you're not in a game");
-            System.out.println();
-        }
-        else Printer.printScores();
-    }
-
-    /**
-     * Parses the showDecks command required by the client.
-     */
-    private void showDecks() {
-        if (isNotInGame()) {
-            System.out.println("Unexpected command");
-            System.out.println("you're not in a game");
-            System.out.println();
-        }
-        else Printer.printDeckInfo();
-    }
-
-    /**
-     * Parses the showObjectives command required by the client.
-     */
-    private void showObjectives() {
-        if (isNotInGame()) {
-            System.out.println("Unexpected command");
-            System.out.println("you're not in a game");
-            System.out.println();
-        }
-        else {
-            Printer.printObjectives();
-        }
-    }
-
-    /**
-     * Parses the showGuide command required by the client.
-     */
-    private void showGuide() {
-        Printer.printGuide();
-    }
-
-    private boolean isNotInGame(){
-        ClientState clientState = ClientStateModel.getInstance().getClientState();
-        return (clientState != ClientState.PLACING_STATE && clientState != ClientState.DRAWING_STATE && clientState != ClientState.NOT_PLAYING_STATE && clientState != ClientState.LAST_ROUND_STATE);
     }
 }
