@@ -1,5 +1,6 @@
 package it.polimi.ingsw.server.controller;
 import it.polimi.ingsw.network.ClientHandler;
+import it.polimi.ingsw.server.model.DrawSource;
 import it.polimi.ingsw.server.model.Game;
 import it.polimi.ingsw.util.customexceptions.*;
 import it.polimi.ingsw.util.supportclasses.GameState;
@@ -19,6 +20,15 @@ public class GameRequestHandler {
     private final Game game;
     private final Map<String, RequestCommand> commands = new HashMap<>();
 
+    private static final Map<String, DrawSource> DRAW_COMMANDS = Map.of(
+            "directDrawResourceCard", DrawSource.RESOURCE_DECK,
+            "directDrawGoldCard", DrawSource.GOLD_DECK,
+            "drawLeftResourceCard", DrawSource.LEFT_RESOURCE,
+            "drawRightResourceCard", DrawSource.RIGHT_RESOURCE,
+            "drawLeftGoldCard", DrawSource.LEFT_GOLD,
+            "drawRightGoldCard", DrawSource.RIGHT_GOLD
+    );
+
     public GameRequestHandler(GameController gameController, ServerMessageGenerator messageGenerator, Game game) {
         this.messageGenerator = messageGenerator;
         this.gameController = gameController;
@@ -26,12 +36,7 @@ public class GameRequestHandler {
         commands.put("ready", (client, message) -> ready(client));
         commands.put("starterCard", (client, message) -> chooseStarterCardOrientation(message, client));
         commands.put("objectiveCard", (client, message) -> chooseSecretObjectiveCard(message, client));
-        commands.put("directDrawResourceCard", (client, message) -> directDrawResourceCard(client));
-        commands.put("directDrawGoldCard", (client, message) -> directDrawGoldCard(client));
-        commands.put("drawLeftResourceCard", (client, message) -> drawLeftRevealedResourceCard(client));
-        commands.put("drawRightResourceCard", (client, message) -> drawRightRevealedResourceCard(client));
-        commands.put("drawLeftGoldCard", (client, message) -> drawLeftRevealedGoldCard(client));
-        commands.put("drawRightGoldCard", (client, message) -> drawRightRevealedGoldCard(client));
+        DRAW_COMMANDS.forEach((command, source) -> commands.put(command, (client, message) -> draw(client, source)));
         commands.put("place", this::place);
         commands.put("leave", (client, message) -> leave(client));
     }
@@ -51,21 +56,12 @@ public class GameRequestHandler {
             return;
         }
 
-        if(game.getGameState() == GameState.lastRound) {
-            if(command.equals("directDrawResourceCard") ||
-                command.equals("directDrawGoldCard") ||
-                command.equals("drawLeftResourceCard") ||
-                command.equals("drawRightResourceCard") ||
-                command.equals("drawLeftGoldCard") ||
-                command.equals("drawRightGoldCard")) {
-                return;
-            }
+        if (game.getGameState() == GameState.lastRound && DRAW_COMMANDS.containsKey(command)) {
+            client.send(messageGenerator.cannotDrawMessage("It's the last round: no more drawing"));
+            return;
         }
-        if(game.getGameState() == GameState.endGame || game.getGameState() == GameState.aClientDisconnected) {
-            if(!command.equals("leave")) {
-                return;
-            }
-        }
+        boolean gameIsOver = game.getGameState() == GameState.endGame || game.getGameState() == GameState.aClientDisconnected;
+        if (gameIsOver && !command.equals("leave")) return;
         RequestCommand handler = commands.get(command);
         if (handler == null) return; //unrecognized command, discarded
         try {
@@ -110,112 +106,13 @@ public class GameRequestHandler {
     }
 
     /**
-     * processes a request from a client to directly draw a resource card from the deck
-     * @param client client handler representing the player who sent the request.
-     */
-    private void directDrawResourceCard(ClientHandler client) {
-        try {
-            gameController.directDrawResourceCard(client);
-            client.send(messageGenerator.updatedHandMessage(gameController.getCurrentPlayer(client)));
-            gameController.broadcast(messageGenerator.updatedDecksMessage());
-        } catch (EmptyDeckException e) {
-            client.send(messageGenerator.cannotDrawMessage("The deck is empty"));
-        } catch (CannotDrawException e) {
-            client.send(messageGenerator.cannotDrawMessage("You must place a card before drawing"));
-        } catch (NotYourTurnException e) {
-            client.send(messageGenerator.cannotDrawMessage("It's not your turn"));
-        } catch (FullHandException e) {
-            client.send(messageGenerator.cannotDrawMessage("Your hand is already full"));
-        }
-    }
-
-    /**
-     * processes a request from a client to directly draw a gold card from the deck
-     * @param client client handler representing the player who sent the request.
-     */
-    private void directDrawGoldCard(ClientHandler client) {
-        try {
-            gameController.directDrawGoldCard(client);
-            client.send(messageGenerator.updatedHandMessage(gameController.getCurrentPlayer(client)));
-            gameController.broadcast(messageGenerator.updatedDecksMessage());
-        } catch (EmptyDeckException e) {
-            client.send(messageGenerator.cannotDrawMessage("The deck is empty"));
-        } catch (CannotDrawException e) {
-            client.send(messageGenerator.cannotDrawMessage("You must place a card before drawing"));
-        } catch (NotYourTurnException e) {
-            client.send(messageGenerator.cannotDrawMessage("It's not your turn"));
-        } catch (FullHandException e) {
-            client.send(messageGenerator.cannotDrawMessage("Your hand is already full"));
-        }
-    }
-
-    /**
-     * processes a request from a client to draw the revealed resource card from the left side of the deck
+     * processes a request from a client to draw a card
      * @param client client handler representing the player who sent the request
+     * @param source where the client wants to draw from
      */
-    private void drawLeftRevealedResourceCard(ClientHandler client)  {
+    private void draw(ClientHandler client, DrawSource source) {
         try {
-            gameController.drawLeftRevealedResourceCard(client);
-            client.send(messageGenerator.updatedHandMessage(gameController.getCurrentPlayer(client)));
-            gameController.broadcast(messageGenerator.updatedDecksMessage());
-        } catch (EmptyDeckException e) {
-            client.send(messageGenerator.cannotDrawMessage("There's no card left there"));
-        } catch (CannotDrawException e) {
-            client.send(messageGenerator.cannotDrawMessage("You must place a card before drawing"));
-        } catch (NotYourTurnException e) {
-            client.send(messageGenerator.cannotDrawMessage("It's not your turn"));
-        } catch (FullHandException e) {
-            client.send(messageGenerator.cannotDrawMessage("Your hand is already full"));
-        }
-    }
-
-    /**
-     * processes a request from a client to draw the revealed resource card from the right side of the deck
-     * @param client client handler representing the player who sent the request
-     */
-    private void drawRightRevealedResourceCard(ClientHandler client) {
-        try {
-            gameController.drawRightRevealedResourceCard(client);
-            client.send(messageGenerator.updatedHandMessage(gameController.getCurrentPlayer(client)));
-            gameController.broadcast(messageGenerator.updatedDecksMessage());
-        } catch (EmptyDeckException e) {
-            client.send(messageGenerator.cannotDrawMessage("There's no card left there"));
-        } catch (CannotDrawException e) {
-            client.send(messageGenerator.cannotDrawMessage("You must place a card before drawing"));
-        } catch (NotYourTurnException e) {
-            client.send(messageGenerator.cannotDrawMessage("It's not your turn"));
-        } catch (FullHandException e) {
-            client.send(messageGenerator.cannotDrawMessage("Your hand is already full"));
-        }
-    }
-
-    /**
-     * processes a request from a client to draw the revealed gold card from the left side of the deck
-     * @param client client handler representing the player who sent the request
-     */
-    private void drawLeftRevealedGoldCard(ClientHandler client) {
-        try {
-            gameController.drawLeftRevealedGoldCard(client);
-            client.send(messageGenerator.updatedHandMessage(gameController.getCurrentPlayer(client)));
-            gameController.broadcast(messageGenerator.updatedDecksMessage());
-        } catch (EmptyDeckException e) {
-            client.send(messageGenerator.cannotDrawMessage("There's no card left there"));
-        } catch (CannotDrawException e) {
-            client.send(messageGenerator.cannotDrawMessage("You must place a card before drawing"));
-        } catch (NotYourTurnException e) {
-            client.send(messageGenerator.cannotDrawMessage("It's not your turn"));
-        } catch (FullHandException e) {
-            client.send(messageGenerator.cannotDrawMessage("Your hand is already full"));
-        }
-    }
-
-    /**
-     * processes a request from a client to draw the revealed gold card from the right side of the deck
-     * @param client client handler representing the player who sent the request
-     */
-    private void drawRightRevealedGoldCard(ClientHandler client) {
-        try {
-            gameController.drawRightRevealedGoldCard(client);
+            gameController.draw(client, source);
             client.send(messageGenerator.updatedHandMessage(gameController.getCurrentPlayer(client)));
             gameController.broadcast(messageGenerator.updatedDecksMessage());
         } catch (EmptyDeckException e) {

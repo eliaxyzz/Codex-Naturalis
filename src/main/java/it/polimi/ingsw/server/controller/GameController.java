@@ -4,6 +4,7 @@ import it.polimi.ingsw.network.ClientHandler;
 import it.polimi.ingsw.server.lobby.Lobby;
 import it.polimi.ingsw.server.lobby.LobbyMessageGenerator;
 import it.polimi.ingsw.network.ServerNetworkObserver;
+import it.polimi.ingsw.server.model.DrawSource;
 import it.polimi.ingsw.server.model.Game;
 import it.polimi.ingsw.server.model.Player;
 import it.polimi.ingsw.server.model.card.*;
@@ -308,95 +309,20 @@ public class GameController implements Runnable, ServerNetworkObserver {
     }
 
     /**
-     * Adds an already-drawn card to the player's hand and advances the game: logs the draw,
-     * checks for the last round condition and passes the turn to the next player.
-     * @param client The ClientHandler representing the player who drew the card.
-     * @param drawnCard The card that was drawn.
-     * @param logDescription Description of the draw used for the echo log, e.g. "a gold card from the deck".
+     * Draws a card for the player whose turn it is and passes the turn.
+     * @param client The ClientHandler representing the player who wants to draw a card.
+     * @param source Where to draw from.
+     * @throws NotYourTurnException Thrown if it's not the player's turn.
+     * @throws CannotDrawException Thrown if the player hasn't placed a card yet this turn.
+     * @throws EmptyDeckException Thrown if there's nothing left to draw there.
      * @throws FullHandException Thrown if the player's hand is already full.
      */
-    private void addDrawnCardAndAdvance(ClientHandler client, PlaceableCard drawnCard, String logDescription) throws FullHandException {
-        getCurrentPlayer(client).addToHand(drawnCard);
-        if(echo) System.out.println("In game '" + gameName + "' player '" + client.getUsername() + "' has drawn " + logDescription);
+    public void draw(ClientHandler client, DrawSource source) throws NotYourTurnException, CannotDrawException, EmptyDeckException, FullHandException {
+        checkCanDraw(client);
+        getCurrentPlayer(client).addToHand(game.draw(source));
+        if(echo) System.out.println("In game '" + gameName + "' player '" + client.getUsername() + "' has drawn " + source.description());
         notifyLastRound();
         passTurn(client);
-    }
-
-    /**
-     * Allows the player associated with the ClientHandler to directly draw a resource card from the deck.
-     * @param client The ClientHandler representing the player who wants to draw a card.
-     * @throws NotYourTurnException Thrown if it's not the player's turn.
-     * @throws EmptyDeckException Thrown if the resource card deck is empty.
-     * @throws FullHandException Thrown if the player's hand is already full.
-     * @throws CannotDrawException Thrown if the player hasn't placed a card yet this turn.
-     */
-    public void directDrawResourceCard (ClientHandler client) throws NotYourTurnException, EmptyDeckException, FullHandException, CannotDrawException {
-        checkCanDraw(client);
-        addDrawnCardAndAdvance(client, game.getResourceCardDeck().directDraw(), "a resource card from the deck");
-    }
-
-    /**
-     * Allows the player associated with the ClientHandler to directly draw a gold card from the deck.
-     * @param client The ClientHandler representing the player who wants to draw a card.
-     * @throws NotYourTurnException Thrown if it's not the player's turn.
-     * @throws FullHandException Thrown if the player's hand is already full.
-     * @throws CannotDrawException Thrown if the player hasn't placed a card yet this turn.
-     */
-    public void directDrawGoldCard (ClientHandler client) throws EmptyDeckException, FullHandException, NotYourTurnException, CannotDrawException {
-        checkCanDraw(client);
-        addDrawnCardAndAdvance(client, game.getGoldCardDeck().directDraw(), "a gold card from the deck");
-    }
-
-    /**
-     * Allows the player associated with the ClientHandler to draw a revealed resource card from the left side of the deck.
-     * @param client The ClientHandler representing the player who wants to draw a card.
-     * @throws NotYourTurnException Thrown if it's not the player's turn.
-     * @throws FullHandException Thrown if the player's hand is already full.
-     * @throws CannotDrawException Thrown if the player hasn't placed a card yet this turn.
-     * @throws EmptyDeckException Thrown if there's no card left in that slot.
-     */
-    public void drawLeftRevealedResourceCard (ClientHandler client) throws EmptyDeckException, FullHandException, NotYourTurnException, CannotDrawException {
-        checkCanDraw(client);
-        addDrawnCardAndAdvance(client, game.getResourceCardDeck().drawLeftRevealedCard(), "the left revealed resource card");
-    }
-
-    /**
-     * Allows the player associated with the ClientHandler to draw a revealed resource card from the right side of the deck.
-     * @param client The ClientHandler representing the player who wants to draw a card.
-     * @throws NotYourTurnException Thrown if it's not the player's turn.
-     * @throws FullHandException Thrown if the player's hand is already full.
-     * @throws CannotDrawException Thrown if the player hasn't placed a card yet this turn.
-     * @throws EmptyDeckException Thrown if there's no card left in that slot.
-     */
-    public void drawRightRevealedResourceCard (ClientHandler client) throws EmptyDeckException, FullHandException, NotYourTurnException, CannotDrawException {
-        checkCanDraw(client);
-        addDrawnCardAndAdvance(client, game.getResourceCardDeck().drawRightRevealedCard(), "the right revealed resource card");
-    }
-
-    /**
-     * Allows the player associated with the ClientHandler to draw a revealed gold card from the left side of the deck.
-     * @param client The ClientHandler representing the player who wants to draw a card.
-     * @throws NotYourTurnException Thrown if it's not the player's turn.
-     * @throws FullHandException Thrown if the player's hand is already full.
-     * @throws CannotDrawException Thrown if the player hasn't placed a card yet this turn.
-     * @throws EmptyDeckException Thrown if there's no card left in that slot.
-     */
-    public void drawLeftRevealedGoldCard (ClientHandler client) throws EmptyDeckException, FullHandException, NotYourTurnException, CannotDrawException {
-        checkCanDraw(client);
-        addDrawnCardAndAdvance(client, game.getGoldCardDeck().drawLeftRevealedCard(), "the left revealed gold card");
-    }
-
-    /**
-     * Allows the player associated with the ClientHandler to draw a revealed gold card from the right side of the deck.
-     * @param client The ClientHandler representing the player who wants to draw a card.
-     * @throws NotYourTurnException Thrown if it's not the player's turn.
-     * @throws FullHandException Thrown if the player's hand is already full.
-     * @throws CannotDrawException Thrown if the player hasn't placed a card yet this turn.
-     * @throws EmptyDeckException Thrown if there's no card left in that slot.
-     */
-    public void drawRightRevealedGoldCard (ClientHandler client) throws EmptyDeckException, FullHandException, NotYourTurnException, CannotDrawException {
-        checkCanDraw(client);
-        addDrawnCardAndAdvance(client, game.getGoldCardDeck().drawRightRevealedCard(), "the right revealed gold card");
     }
 
     /**

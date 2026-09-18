@@ -1,6 +1,7 @@
 package it.polimi.ingsw.server.model;
 
 import it.polimi.ingsw.server.model.card.ObjectiveCard;
+import it.polimi.ingsw.server.model.card.PlaceableCard;
 import it.polimi.ingsw.server.model.deck.GoldCardDeck;
 import it.polimi.ingsw.server.model.deck.ObjectiveCardDeck;
 import it.polimi.ingsw.server.model.deck.ResourceCardDeck;
@@ -140,6 +141,22 @@ public class Game {
             return "decks are empty";
         }
         return null;
+    }
+
+    /**
+     * @param source Where to draw from.
+     * @return The drawn card.
+     * @throws EmptyDeckException If there's nothing left there.
+     */
+    public PlaceableCard draw(DrawSource source) throws EmptyDeckException {
+        return switch (source) {
+            case RESOURCE_DECK -> resourceCardDeck.directDraw();
+            case GOLD_DECK -> goldCardDeck.directDraw();
+            case LEFT_RESOURCE -> resourceCardDeck.drawLeftRevealedCard();
+            case RIGHT_RESOURCE -> resourceCardDeck.drawRightRevealedCard();
+            case LEFT_GOLD -> goldCardDeck.drawLeftRevealedCard();
+            case RIGHT_GOLD -> goldCardDeck.drawRightRevealedCard();
+        };
     }
 
     public ObjectiveCardDeck getObjectiveCardDeck() {
