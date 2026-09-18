@@ -8,7 +8,7 @@ import java.util.ArrayList;
  */
 public class GameFieldModel extends ObservableModel {
 
-    private static GameFieldModel instance;
+    private static final GameFieldModel instance = new GameFieldModel();
     private ArrayList<CardRepresentation> placementHistory;
 
     /**
@@ -16,9 +16,7 @@ public class GameFieldModel extends ObservableModel {
      * @return The singleton instance of GameFieldModel.
      */
     public static GameFieldModel getInstance(){
-        if (instance ==null) instance = new GameFieldModel();
         return instance;
-
     }
 
     private GameFieldModel(){

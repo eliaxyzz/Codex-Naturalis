@@ -9,17 +9,14 @@ import java.util.ArrayList;
 public class HandModel extends ObservableModel {
 
     private ArrayList<CardRepresentation> cardsInHand;
-    private static HandModel instance;
+    private static final HandModel instance = new HandModel();
 
     /**
      * Returns the singleton instance of HandModel.
      * @return The singleton instance of HandModel.
      */
     public static HandModel getInstance(){
-
-        if (instance ==null) instance = new HandModel();
         return instance;
-
     }
 
     private HandModel(){

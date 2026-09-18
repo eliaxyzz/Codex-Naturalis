@@ -10,7 +10,7 @@ import java.util.HashMap;
  */
 public class ScoreBoardModel extends ObservableModel{
 
-    private static ScoreBoardModel instance;
+    private static final ScoreBoardModel instance = new ScoreBoardModel();
     private HashMap<String, Integer> scores;
     private HashMap<String, Token> tokens;
     private ArrayList<JSONObject> leaderboard;
@@ -30,7 +30,6 @@ public class ScoreBoardModel extends ObservableModel{
     }
 
     public static ScoreBoardModel getInstance(){
-        if (instance ==null) instance = new ScoreBoardModel();
         return instance;
     }
 

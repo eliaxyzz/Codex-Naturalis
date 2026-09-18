@@ -7,14 +7,13 @@ import it.polimi.ingsw.util.supportclasses.Token;
  */
 public class PlayerModel extends ObservableModel {
 
-    private static PlayerModel instance;
+    private static final PlayerModel instance = new PlayerModel();
     private String username;
     private String turnPlayer;
     private Token token;
     private boolean lastTurn;
 
     public static PlayerModel getInstance(){
-        if (instance ==null) instance = new PlayerModel();
         return instance;
     }
 

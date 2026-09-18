@@ -5,7 +5,7 @@ package it.polimi.ingsw.client.model;
  */
 public class ObjectivesModel extends ObservableModel{
 
-    private static ObjectivesModel instance;
+    private static final ObjectivesModel instance = new ObjectivesModel();
 
     private int secretObjectiveId;
     private int[] commonObjectives;
@@ -17,7 +17,6 @@ public class ObjectivesModel extends ObservableModel{
      * @return The singleton instance of ObjectivesModel.
      */
     public static ObjectivesModel getInstance(){
-        if (instance ==null) instance = new ObjectivesModel();
         return instance;
     }
 

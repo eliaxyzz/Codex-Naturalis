@@ -5,7 +5,7 @@ package it.polimi.ingsw.client.model;
  */
 public class SelectableCardsModel extends ObservableModel{
 
-    private static SelectableCardsModel instance;
+    private static final SelectableCardsModel instance = new SelectableCardsModel();
 
     private int starterCardId;
     private int[] selectableObjectiveCardsId;
@@ -15,7 +15,6 @@ public class SelectableCardsModel extends ObservableModel{
      * @return  The singleton instance of SelectableCardsModel.
      */
     public static SelectableCardsModel getInstance(){
-        if (instance ==null) instance = new SelectableCardsModel();
         return instance;
     }
 

@@ -12,17 +12,14 @@ public class DeckModel extends ObservableModel{
     private int goldDeckLeftCardId;
     private int goldDeckRightCardId;
 
-    private static DeckModel instance;
+    private static final DeckModel instance = new DeckModel();
 
     /**
      * Returns the singleton instance of DeckModel.
      * @return The singleton instance of DeckModel.
      */
     public static DeckModel getInstance(){
-
-        if (instance ==null) instance = new DeckModel();
         return instance;
-
     }
 
     public int getResourceDeckTopCardId() {

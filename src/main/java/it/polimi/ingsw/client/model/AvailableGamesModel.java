@@ -7,7 +7,7 @@ import java.util.ArrayList;
  */
 public class AvailableGamesModel extends ObservableModel{
 
-    private static AvailableGamesModel instance;
+    private static final AvailableGamesModel instance = new AvailableGamesModel();
 
     private ArrayList<String> games;
 
@@ -16,10 +16,7 @@ public class AvailableGamesModel extends ObservableModel{
      * @return The singleton instance of AvailableGamesModel.
      */
     public static AvailableGamesModel getInstance(){
-
-        if (instance ==null) instance = new AvailableGamesModel();
         return instance;
-
     }
 
     private AvailableGamesModel(){

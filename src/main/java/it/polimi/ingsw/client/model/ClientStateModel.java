@@ -6,7 +6,7 @@ import it.polimi.ingsw.util.supportclasses.ClientState;
  * This class represents an ObservableModel that keeps track of the current client state and optionally a reason for the state change.
  */
 public class ClientStateModel extends ObservableModel{
-    private static ClientStateModel instance;
+    private static final ClientStateModel instance = new ClientStateModel();
     private String reason;
 
     private ClientState clientState = ClientState.LOBBY_STATE;
@@ -16,10 +16,7 @@ public class ClientStateModel extends ObservableModel{
      * @return The singleton instance of ClientStateModel.
      */
     public static ClientStateModel getInstance(){
-
-        if (instance ==null) instance = new ClientStateModel();
         return instance;
-
     }
 
     public  ClientState getClientState() {
