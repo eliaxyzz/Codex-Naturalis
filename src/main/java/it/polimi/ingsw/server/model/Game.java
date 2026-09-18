@@ -67,6 +67,69 @@ public class Game {
 
     public Map<String, Player> getPlayersHashMap() { return players;}
 
+    public Player getPlayer(String username) {
+        return players.get(username);
+    }
+
+    public boolean isFull() {
+        return players.size() == numberOfPlayers;
+    }
+
+    /**
+     * @return true between card selection and the end of the last round.
+     */
+    public boolean isUnderWay() {
+        return gameState == GameState.waitingForCardsSelection || gameState == GameState.playing || gameState == GameState.lastRound;
+    }
+
+    public Player addPlayer(String username) {
+        Player player = new Player(this);
+        players.put(username, player);
+        return player;
+    }
+
+    /**
+     * Takes the player out of the game and makes their token available again.
+     */
+    public void removePlayer(String username) {
+        Player player = players.remove(username);
+        if (player != null) reinsertToken(player.getToken());
+    }
+
+    /**
+     * Once the table is full and everyone is ready, deals each player a starter card and two
+     * objectives to choose from.
+     * @return true if the cards were dealt now.
+     */
+    public boolean dealSetupCardsIfReady() {
+        if (gameState != GameState.waitingForPlayers || !isFull()) return false;
+        for (Player player : players.values()) {
+            if (!player.isReady()) return false;
+        }
+        try {
+            for (Player player : players.values()) {
+                player.setStarterCard(starterCardDeck.directDraw());
+                player.setDrawnObjectiveCards(new ObjectiveCard[]{objectiveCardDeck.directDraw(), objectiveCardDeck.directDraw()});
+            }
+        } catch (EmptyDeckException e) {
+            //the decks hold enough cards for four players, running out here means the card data is broken
+            throw new IllegalStateException("not enough starter or objective cards to deal", e);
+        }
+        gameState = GameState.waitingForCardsSelection;
+        return true;
+    }
+
+    /**
+     * @return true once every player has picked a starter card side and a secret objective.
+     */
+    public boolean setupChoicesComplete() {
+        if (gameState != GameState.waitingForCardsSelection) return false;
+        for (Player player : players.values()) {
+            if (!player.isStarterCardOrientationSelected() || player.getSecretObjective() == null) return false;
+        }
+        return true;
+    }
+
     public ArrayList<Player> getPlayers() {
         return new ArrayList<>(players.values());
     }

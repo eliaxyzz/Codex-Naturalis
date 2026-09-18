@@ -1,16 +1,13 @@
 package it.polimi.ingsw.server.controller;
 
-import it.polimi.ingsw.server.ServerLog;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import it.polimi.ingsw.network.ClientHandler;
+import it.polimi.ingsw.network.ServerNetworkObserver;
+import it.polimi.ingsw.server.ServerLog;
 import it.polimi.ingsw.server.lobby.Lobby;
 import it.polimi.ingsw.server.lobby.LobbyMessageGenerator;
-import it.polimi.ingsw.network.ServerNetworkObserver;
 import it.polimi.ingsw.server.model.DrawSource;
 import it.polimi.ingsw.server.model.Game;
 import it.polimi.ingsw.server.model.Player;
-import it.polimi.ingsw.server.model.card.*;
 import it.polimi.ingsw.util.customexceptions.*;
 import it.polimi.ingsw.util.supportclasses.GameState;
 import it.polimi.ingsw.util.supportclasses.Request;
@@ -21,35 +18,35 @@ import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
- * This class manages the logic of a game instance. It acts as the central controller
- *  for the game, coordinating interactions between players, the game model and the server network.
+ * Runs one game: connects the players' connections to the Game model and tells everyone what happened.
+ * The rules live in Game and Player; this class sequences them and does the messaging.
+ * <p>
  * Every change to the game happens on the game's own thread: network requests, joins and
  * disconnects all arrive as tasks on {@code tasks}. clientHandlers is still a CopyOnWriteArrayList
  * because the lobby and the server console read it (player counts, game info) from their threads.
  */
 public class GameController implements Runnable, ServerNetworkObserver {
     private static final Logger LOG = ServerLog.get();
+
     private final String gameName;
-    private final List<ClientHandler> clientHandlers;
+    private final List<ClientHandler> clientHandlers = new CopyOnWriteArrayList<>();
     private final Lobby lobby;
     private final Game game;
-    private final BlockingQueue<Runnable> tasks;
-    private volatile boolean running;
+    private final BlockingQueue<Runnable> tasks = new LinkedBlockingQueue<>();
     private final GameRequestHandler gameRequestHandler;
     private final ServerMessageGenerator messageGenerator;
+    private volatile boolean running = true;
 
     public GameController(Lobby lobby, int numberOfPlayers, String gameName) {
         this.gameName = gameName;
-        this.clientHandlers = new CopyOnWriteArrayList<>();
         this.lobby = lobby;
-        this.tasks = new LinkedBlockingQueue<>();
-        running = true;
         this.game = new Game(numberOfPlayers);
         this.messageGenerator = new ServerMessageGenerator(game);
         this.gameRequestHandler = new GameRequestHandler(this, messageGenerator, game);
-
         LOG.info(() -> "Game '" + gameName + "' is ready to receive players");
     }
 
@@ -67,10 +64,6 @@ public class GameController implements Runnable, ServerNetworkObserver {
         }
     }
 
-    public String getGameName() {
-        return gameName;
-    }
-
     @Override
     public void submitNewRequest(Request request) {
         tasks.add(() -> gameRequestHandler.execute(request));
@@ -86,6 +79,20 @@ public class GameController implements Runnable, ServerNetworkObserver {
         tasks.add(() -> enterGame(client, confirmation));
     }
 
+    @Override
+    public void notifyConnectionLoss(ClientHandler client) {
+        LOG.info(() -> "In game '" + gameName + "' player '" + client.getUsername() + "' disconnected");
+        tasks.add(() -> {
+            removePlayer(client);
+            //the lobby still has to forget the client (username, connected list)
+            lobby.notifyConnectionLoss(client);
+        });
+    }
+
+    public String getGameName() {
+        return gameName;
+    }
+
     public Game getGame() {
         return game;
     }
@@ -98,8 +105,22 @@ public class GameController implements Runnable, ServerNetworkObserver {
         return game.getNumberOfPlayers();
     }
 
+    public Player getCurrentPlayer(ClientHandler client) {
+        return game.getPlayer(client.getUsername());
+    }
+
+    public String getTurnPlayerUsername() {
+        return game.getTurnPlayer();
+    }
+
+    public void broadcast(JSONObject message) {
+        for (ClientHandler player : clientHandlers) {
+            player.send(message);
+        }
+    }
+
     private void enterGame(ClientHandler client, JSONObject confirmation) {
-        if (gameIsFull() || game.getGameState() != GameState.waitingForPlayers) {
+        if (game.isFull() || game.getGameState() != GameState.waitingForPlayers) {
             client.send(LobbyMessageGenerator.gameIsFullMessage());
             return;
         }
@@ -111,14 +132,13 @@ public class GameController implements Runnable, ServerNetworkObserver {
             return;
         }
         clientHandlers.add(client);
-        game.getPlayersHashMap().put(client.getUsername(), new Player(game));
+        game.addPlayer(client.getUsername());
         client.send(confirmation);
-        LOG.info(() -> "Player '" + client.getUsername() + "' joined the game '" + gameName +"'");
+        LOG.info(() -> "Player '" + client.getUsername() + "' joined the game '" + gameName + "'");
     }
 
     /**
      * The player chose to leave: back to the lobby they go.
-     * @param client Client who left the game.
      */
     public void leaveGame(ClientHandler client) {
         removePlayer(client);
@@ -130,138 +150,77 @@ public class GameController implements Runnable, ServerNetworkObserver {
      * Does nothing if the client isn't (or is no longer) in this game.
      */
     private void removePlayer(ClientHandler client) {
-        if (!clientHandlers.contains(client)) return;
-        game.reinsertToken(getCurrentPlayer(client).getToken());
-        game.getPlayersHashMap().remove(client.getUsername());
-        clientHandlers.remove(client);
+        if (!clientHandlers.remove(client)) return;
+        game.removePlayer(client.getUsername());
         client.setGame(null);
-        LOG.info(() -> "Player '" + client.getUsername() + "' left the game '" + gameName +"'");
-        if(game.getGameState() == GameState.waitingForCardsSelection || game.getGameState() == GameState.playing || game.getGameState() == GameState.lastRound) {
-            disconnectionDuringGameProcedure();
+        LOG.info(() -> "Player '" + client.getUsername() + "' left the game '" + gameName + "'");
+        if (game.isUnderWay()) {
+            game.setGameState(GameState.aClientDisconnected);
+            LOG.info(() -> "Game '" + gameName + "' is closing");
+            broadcast(messageGenerator.closingGameMessage());
         }
-        notifyConnectedClientCountChanged();
-    }
-
-    /**
-     * Retrieves the Player object associated with the provided ClientHandler.
-     * @param client The ClientHandler representing the player.
-     * @return The Player object for the given client, or null if not found.
-     */
-    public Player getCurrentPlayer(ClientHandler client) {
-        return game.getPlayersHashMap().get(client.getUsername());
-    }
-
-    /**
-     * Sets the game state to aClientDisconnected, broadcasts a closing game message to all players,
-     *  and then removes all remaining players from the game.
-     */
-    private void disconnectionDuringGameProcedure() {
-        game.setGameState(GameState.aClientDisconnected);
-        LOG.info(() -> "Game '" + gameName + "' is closing");
-        broadcast(messageGenerator.closingGameMessage());
-
-    }
-
-    private boolean isNotTheTurnOf(ClientHandler client) {
-        return !game.isTurnOf(client.getUsername());
-    }
-
-    /**
-     * Ends the current player's turn, tells everyone whose turn it is and, if that closed
-     * the last round, sends the final leaderboard.
-     * @param client The ClientHandler representing the current player.
-     */
-    private void passTurn (ClientHandler client) {
-        getCurrentPlayer(client).clearTurnState();
-        boolean gameOver = game.passTurn();
-        broadcast(messageGenerator.turnPlayerUpdateMessage(this));
-        if (gameOver) {
-            LOG.info(() -> "Game '" + gameName + "' has ended");
-            calculateFinalScore();
+        if (clientHandlers.isEmpty()) {
+            LOG.info(() -> "There are no more players in the game '" + gameName + "': game is closed");
+            lobby.closeGame(gameName);
+            running = false;
         }
     }
 
-    public String getTurnPlayerUsername() {
-        return game.getTurnPlayer();
-    }
-
-    /**
-     * Draws a starter card for each player.
-     */
-    private void starterCardsSelectionPreparation() {
-        StarterCard starterCard=null;
-        for(Player p : game.getPlayers()) {
-            try {
-                starterCard = game.getStarterCardDeck().directDraw();
-            } catch (EmptyDeckException ignored) {}
-            p.setStarterCard(starterCard);
+    public void ready(ClientHandler client) {
+        getCurrentPlayer(client).setReady(true);
+        LOG.info(() -> "In game '" + gameName + "' player '" + client.getUsername() + "' is ready");
+        if (!game.dealSetupCardsIfReady()) return;
+        lobby.makeUnavailable(gameName);
+        for (ClientHandler c : clientHandlers) {
+            Player player = getCurrentPlayer(c);
+            c.send(messageGenerator.cardsSelectionMessage(player.getStarterCard(), player.getDrawnObjectiveCards()[0], player.getDrawnObjectiveCards()[1]));
         }
+        LOG.info(() -> "In game '" + gameName + "' all players are ready");
     }
 
     /**
-     * Draws 2 objective cards for each player.
+     * @return false if the id isn't the player's starter card or the side was already chosen.
      */
-    private void secretObjectiveCardsSelectionPreparation()
-    {
-        for (Player p : game.getPlayers()) {
-            try {
-                ObjectiveCard cardTemp1 = game.getObjectiveCardDeck().directDraw();
-                ObjectiveCard cardTemp2 = game.getObjectiveCardDeck().directDraw();
-                p.setDrawnObjectiveCards(new ObjectiveCard[]{cardTemp1, cardTemp2});
-            } catch (EmptyDeckException ignored) {
-            }
-        }
+    public boolean chooseStarterCardSide(ClientHandler client, int starterCardId, boolean facingUp) {
+        if (!getCurrentPlayer(client).chooseStarterSide(starterCardId, facingUp)) return false;
+        LOG.info(() -> "In game '" + gameName + "' player '" + client.getUsername() + "' chose to play their starter card on the " + (facingUp ? "front" : "back"));
+        startGameIfSetupComplete();
+        return true;
     }
 
     /**
-     * Prepares the game to wait for players to choose the starter card orientation and the secret objective.
+     * @return false if the id isn't one of the two objectives the player was dealt.
      */
-    private void gamePreparation (){
-        starterCardsSelectionPreparation();
-        secretObjectiveCardsSelectionPreparation();
+    public boolean chooseSecretObjectiveCard(ClientHandler client, int objectiveCardId) {
+        if (!getCurrentPlayer(client).chooseSecretObjective(objectiveCardId)) return false;
+        LOG.info(() -> "In game '" + gameName + "' player '" + client.getUsername() + "' chose the secret objective " + objectiveCardId);
+        startGameIfSetupComplete();
+        return true;
     }
 
-    /**
-     * Sets the flag ready to true when the player is ready to play.
-     * @param player The player that is now ready.
-     */
-    public void ready(ClientHandler player){
-        getCurrentPlayer(player).setReady(true);
-        LOG.info(() -> "In game '" + gameName + "' player '" + player.getUsername() + "' is ready");
-        notifyReady();
-    }
-
-    /**
-     * Communicates to the players the game is about to start and sends their cards.
-     */
-    private void startGame () {
+    private void startGameIfSetupComplete() {
+        if (!game.setupChoicesComplete()) return;
         //random turn order; clientHandlers follows it too so score lists come out in turn order
         Collections.shuffle(clientHandlers);
         game.startPlaying(clientHandlers.stream().map(ClientHandler::getUsername).toList());
-        //initializes the hand of each player
-        for(Player p : game.getPlayers()) {
-            p.initializeHand();
+        for (Player player : game.getPlayers()) {
+            player.initializeHand();
+            player.clearTurnState();
         }
-        //sends the starting messages to each player
         for (ClientHandler client : clientHandlers) {
             client.send(messageGenerator.startGameMessage(this, getCurrentPlayer(client)));
-            getCurrentPlayer(client).clearTurnState();
         }
         broadcast(messageGenerator.updatedScoresMessage(this));
         LOG.info(() -> "Game '" + gameName + "' is starting");
     }
 
     /**
-     * Places a card on the board for the player associated with the provided ClientHandler.
-     * @param client The ClientHandler representing the player who wants to place the card.
-     * @param placeableCardId The ID of the card in the player's hand to be placed.
-     * @param facingUp Whether the card should be placed face up (true) or face down (false).
-     * @param x The x-coordinate on the board where the card should be placed.
-     * @param y The y-coordinate on the board where the card should be placed.
-     * @throws CannotPlaceCardException Thrown if it's not the player's turn or the card cannot be placed for some reason.
+     * Places a card from the hand of the player whose turn it is. In the last round there's
+     * no draw afterwards, so placing ends the turn.
+     * @throws CannotPlaceCardException If it's not the player's turn or the placement is illegal.
      */
-    public void place (ClientHandler client,int placeableCardId, boolean facingUp, int x, int y) throws CannotPlaceCardException {
-        if(isNotTheTurnOf(client)) {
+    public void place(ClientHandler client, int placeableCardId, boolean facingUp, int x, int y) throws CannotPlaceCardException {
+        if (!game.isTurnOf(client.getUsername())) {
             throw new CannotPlaceCardException("You can't place a card, it's not your turn!");
         }
         try {
@@ -269,157 +228,30 @@ public class GameController implements Runnable, ServerNetworkObserver {
         } catch (CardNotInHandException e) {
             throw new CannotPlaceCardException("The card is not in your hand");
         }
-        notifyLastRound();
+        startLastRoundIfDue();
         broadcast(messageGenerator.updatedScoresMessage(this));
         LOG.info(() -> "In game '" + gameName + "' player '" + client.getUsername() + "' placed the card " + placeableCardId + " at X:" + x + " Y:" + y);
-        if(game.getGameState() == GameState.lastRound) passTurn(client);
-    }
-
-    /**
-     * Checks that the client is allowed to draw right now: it must be their turn and
-     * they must have already placed a card this turn.
-     * @param client The ClientHandler representing the player who wants to draw a card.
-     * @throws NotYourTurnException Thrown if it's not the player's turn.
-     * @throws CannotDrawException Thrown if the player hasn't placed a card yet this turn.
-     */
-    private void checkCanDraw(ClientHandler client) throws NotYourTurnException, CannotDrawException {
-        if (isNotTheTurnOf(client)) {
-            throw new NotYourTurnException();
-        }
-        if (!getCurrentPlayer(client).hasAlreadyPlaced()) {
-            throw new CannotDrawException();
-        }
+        if (game.getGameState() == GameState.lastRound) passTurn(client);
     }
 
     /**
      * Draws a card for the player whose turn it is and passes the turn.
-     * @param client The ClientHandler representing the player who wants to draw a card.
-     * @param source Where to draw from.
-     * @throws NotYourTurnException Thrown if it's not the player's turn.
-     * @throws CannotDrawException Thrown if the player hasn't placed a card yet this turn.
-     * @throws EmptyDeckException Thrown if there's nothing left to draw there.
-     * @throws FullHandException Thrown if the player's hand is already full.
+     * @throws NotYourTurnException If it's not the player's turn.
+     * @throws CannotDrawException If the player hasn't placed a card yet this turn.
+     * @throws EmptyDeckException If there's nothing left to draw there.
+     * @throws FullHandException If the player's hand is already full.
      */
     public void draw(ClientHandler client, DrawSource source) throws NotYourTurnException, CannotDrawException, EmptyDeckException, FullHandException {
-        checkCanDraw(client);
-        getCurrentPlayer(client).addToHand(game.draw(source));
+        if (!game.isTurnOf(client.getUsername())) throw new NotYourTurnException();
+        Player player = getCurrentPlayer(client);
+        if (!player.hasAlreadyPlaced()) throw new CannotDrawException();
+        player.addToHand(game.draw(source));
         LOG.info(() -> "In game '" + gameName + "' player '" + client.getUsername() + "' has drawn " + source.description());
-        notifyLastRound();
+        startLastRoundIfDue();
         passTurn(client);
     }
 
-    /**
-     * Selects the orientation of the starter card and places it.
-     * @param client The player that selected the orientation.
-     * @param starterCardId The starter card id.
-     * @param facingUp The orientation: true if the front is facing up, false otherwise.
-     * @return true if the id matched the player's starter card, false otherwise.
-     */
-    public boolean chooseStarterCardSide(ClientHandler client, int starterCardId, boolean facingUp) {
-        Player currentPlayer = getCurrentPlayer(client);
-        if (currentPlayer.getStarterCard().getId() == starterCardId) {
-            currentPlayer.place(currentPlayer.getStarterCard(), facingUp);
-            LOG.info(() -> "In game '" + gameName + "' player '" + client.getUsername() + "' chose to play their starter card on the " + (facingUp ? "front" : "back"));
-            currentPlayer.setStarterCardOrientationSelected(true);
-            notifyStarterCardAndSecretObjectiveSelected();
-            return true;
-        }
-        return false;
-    }
-
-    /**
-     * Selects the chosen secret objective between the two drawn objective cards.
-     * @param client The player choosing the secret objective.
-     * @param objectiveCardId The chosen secret objective card id.
-     * @return true if the id matched one of the two drawn objective cards, false otherwise.
-     */
-    public boolean chooseSecretObjectiveCard (ClientHandler client,int objectiveCardId){
-        Player currentPlayer = getCurrentPlayer(client);
-        for(ObjectiveCard drawnObjectiveCard : currentPlayer.getDrawnObjectiveCards())
-            if (drawnObjectiveCard.getId() == objectiveCardId) {
-                currentPlayer.setSecretObjective(drawnObjectiveCard);
-                notifyStarterCardAndSecretObjectiveSelected();
-                LOG.info(() -> "In game '"+ gameName + "' player '" + client.getUsername() + "' chose to the secret objective " + objectiveCardId);
-                return true;
-            }
-        return false;
-    }
-
-    /**
-     * Broadcasts a JSON message to all connected clients in the game.
-     * @param message The JSON message to be sent to all clients.
-     */
-    public void broadcast (JSONObject message){
-        for (ClientHandler player : clientHandlers) {
-            player.send(message);
-        }
-    }
-
-    private void notifyConnectedClientCountChanged() {
-        if(clientHandlers.isEmpty()) {
-            LOG.info(() -> "There are no more players in the game '" + gameName + "': game is closed");
-            lobby.closeGame(gameName);
-            running = false;
-        }
-    }
-
-    @Override
-    public void notifyConnectionLoss (ClientHandler client) {
-        LOG.info(() -> "In game '" + gameName + "' player '" + client.getUsername() + "' disconnected");
-        tasks.add(() -> handleConnectionLoss(client));
-    }
-
-    /**
-     * Runs on the game thread, so it never races with a command being handled for another player.
-     * The lobby still has to forget the client (username, connected list) once it's out of the game.
-     */
-    private void handleConnectionLoss(ClientHandler client) {
-        removePlayer(client);
-        lobby.notifyConnectionLoss(client);
-    }
-
-    private boolean gameIsFull() {
-        return game.getPlayersHashMap().size() == game.getNumberOfPlayers();
-    }
-
-    private void notifyReady() {
-        if(!gameIsFull()) return;
-        if(game.getGameState()!=GameState.waitingForPlayers) return;
-
-        for (Player p : game.getPlayers()) {
-            if(!p.isReady())
-                return;
-        }
-        lobby.makeUnavailable(gameName);
-        game.setGameState(GameState.waitingForCardsSelection);
-        gamePreparation();
-        sendCardsSelectionMessageToThePlayers();
-        LOG.info(() -> "In game '" + gameName + "' all players are ready");
-    }
-
-    /**
-     * sends a message to each player containing their starter card and drawn objective cards.
-     */
-    private void sendCardsSelectionMessageToThePlayers() {
-        for (ClientHandler c : clientHandlers) {
-            StarterCard starterCard = getCurrentPlayer(c).getStarterCard();
-            ObjectiveCard objectiveCard1 = getCurrentPlayer(c).getDrawnObjectiveCards()[0];
-            ObjectiveCard objectiveCard2 = getCurrentPlayer(c).getDrawnObjectiveCards()[1];
-            c.send(messageGenerator.cardsSelectionMessage(starterCard, objectiveCard1, objectiveCard2));
-        }
-    }
-
-    private void notifyStarterCardAndSecretObjectiveSelected() {
-        if(game.getGameState() != GameState.waitingForCardsSelection) return;
-        for (ClientHandler player : clientHandlers) {
-            Player currentPlayer = getCurrentPlayer(player);
-            if(!currentPlayer.isStarterCardOrientationSelected() || currentPlayer.getSecretObjective() == null) return;
-        }
-        LOG.info(() -> "In game '" + gameName + "' all players selected the starter card side and secret objective");
-        startGame();
-    }
-
-    private void notifyLastRound() {
+    private void startLastRoundIfDue() {
         String reason = game.startLastRoundIfDue();
         if (reason == null) return;
         broadcast(messageGenerator.lastRoundMessage(reason));
@@ -427,26 +259,35 @@ public class GameController implements Runnable, ServerNetworkObserver {
     }
 
     /**
-     * Calculates the final leaderboard and sends it to each client.
+     * Ends the current player's turn, tells everyone whose turn it is and, if that closed
+     * the last round, sends the final leaderboard.
      */
-    private void calculateFinalScore() {
-        ArrayList<ClientHandler> classifiedPlayers = new ArrayList<>();
-        for (ClientHandler c : clientHandlers) {
-            classifiedPlayers.add(c);
+    private void passTurn(ClientHandler client) {
+        getCurrentPlayer(client).clearTurnState();
+        boolean gameOver = game.passTurn();
+        broadcast(messageGenerator.turnPlayerUpdateMessage(this));
+        if (gameOver) {
+            LOG.info(() -> "Game '" + gameName + "' has ended");
+            sendLeaderboard();
+        }
+    }
+
+    private void sendLeaderboard() {
+        ArrayList<ClientHandler> ranking = new ArrayList<>(clientHandlers);
+        for (ClientHandler c : ranking) {
             getCurrentPlayer(c).calculateFinalScore();
         }
-        classifiedPlayers.sort((c1, c2) -> getCurrentPlayer(c1).compareTo(getCurrentPlayer(c2)));
-        broadcast(messageGenerator.leaderBoardMessage(this , classifiedPlayers));
+        ranking.sort((c1, c2) -> getCurrentPlayer(c1).compareTo(getCurrentPlayer(c2)));
+        broadcast(messageGenerator.leaderBoardMessage(this, ranking));
         LOG.info(() -> {
             StringBuilder leaderboard = new StringBuilder("Game '" + gameName + "' leaderboard:");
-            for (int i = 0; i < classifiedPlayers.size(); i++) {
-                Player player = getCurrentPlayer(classifiedPlayers.get(i));
-                leaderboard.append(System.lineSeparator()).append(i + 1).append(": ").append(classifiedPlayers.get(i).getUsername())
+            for (int i = 0; i < ranking.size(); i++) {
+                Player player = getCurrentPlayer(ranking.get(i));
+                leaderboard.append(System.lineSeparator()).append(i + 1).append(": ").append(ranking.get(i).getUsername())
                         .append(" ").append(player.getScore()).append(" points (")
                         .append(player.getNumOfCompletedObjectiveCards()).append(" objectives completed)");
             }
             return leaderboard.toString();
         });
     }
-
 }

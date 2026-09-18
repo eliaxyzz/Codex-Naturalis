@@ -102,14 +102,6 @@ public class Player implements Comparable<Player> {
         isReady = ready;
     }
     /**
-     * sets the starter-card orientation chosen by the player
-     * @param starterCardOrientationSelected is the orientation selected by the player
-     */
-    public void setStarterCardOrientationSelected(boolean starterCardOrientationSelected) {
-        this.starterCardOrientationSelected = starterCardOrientationSelected;
-    }
-
-    /**
      * adds to the player's hand the first 3 cards of his game
      */
     public void initializeHand() {
@@ -139,12 +131,29 @@ public class Player implements Comparable<Player> {
     }
 
     /**
-     * sets the secrete objective card chosen by the player
-     * @param objectiveCard chosen by the player at the beginning of the match
+     * Places the starter card on the chosen side. Only works once, and only for the card this player was dealt.
+     * @return true if the choice was accepted.
      */
-    public void setSecretObjective(ObjectiveCard objectiveCard) {
-        if(this.secretObjective != null) return;
-        this.secretObjective = objectiveCard;
+    public boolean chooseStarterSide(int starterCardId, boolean facingUp) {
+        if (starterCardOrientationSelected || starterCard == null || starterCard.getId() != starterCardId) return false;
+        place(starterCard, facingUp);
+        starterCardOrientationSelected = true;
+        return true;
+    }
+
+    /**
+     * Keeps one of the two objectives this player was dealt as their secret objective.
+     * @return true if the choice was accepted.
+     */
+    public boolean chooseSecretObjective(int objectiveCardId) {
+        if (secretObjective != null) return false;
+        for (ObjectiveCard offered : drawnObjectiveCards) {
+            if (offered != null && offered.getId() == objectiveCardId) {
+                secretObjective = offered;
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
