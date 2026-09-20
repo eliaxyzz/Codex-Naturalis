@@ -18,7 +18,7 @@
 | Client CLI                  | ✅ |
 | Server CLI                  | ✅ |
 | Multiple games              | ✅ |
-| Persistence | ❌ |
+| Persistence | ✅ |
 | Chat | ✅ |
 | Connection resilience | ✅ |
 
@@ -55,6 +55,14 @@ The server is built around a few single-threaded owners that talk through queues
 A client is routed to the lobby or to its game by `ClientHandler`'s `game` field (`null` means lobby). Game rules (turns, last round, setup cards, scoring) live in `Game`, `Player` and `GameField`. `GameController` only sequences them and sends the messages.
 
 On the client, `ClientController` receives messages on the network thread and updates the observable models in `client/model`. The GUI and CLI views observe those models, and the GUI moves back onto the JavaFX thread with `Platform.runLater`.
+
+### Persistence
+
+Games are written to `saves/`, one JSON file each, after every change. A restarted server picks them all up and they wait there for their players to reconnect, names still reserved.
+
+What gets saved is what was decided, not what was worked out from it: the decks in the order they were left, each player's tallies, and the ordered list of placements they made. A game field is rebuilt by replaying those placements, so the grid, the resource counts and the covered corners are always in step with the cards. A game that ends, or that everyone leaves on purpose, deletes its own file; a game everyone merely dropped out of is kept, because that is the case worth coming back from.
+
+A save that cannot be written is logged and play carries on. A save that cannot be read is skipped at startup, so one bad file can't stop the server.
 
 ### Chat
 

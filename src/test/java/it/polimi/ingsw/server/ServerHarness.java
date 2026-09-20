@@ -3,8 +3,12 @@ package it.polimi.ingsw.server;
 import it.polimi.ingsw.server.lobby.Lobby;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
+import it.polimi.ingsw.server.persistence.GameStore;
 import java.io.IOException;
 import java.net.ServerSocket;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Comparator;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -16,12 +20,31 @@ public class ServerHarness implements AutoCloseable {
     private final Lobby lobby;
     private final int port;
     private final List<TestClient> clients = new ArrayList<>();
+    private final Path saveDirectory;
+    //false when the test owns the directory and wants it to outlive this server
+    private final boolean ownsSaveDirectory;
 
     public ServerHarness() throws Exception {
+        //never touch the real saves directory from a test
+        this(Files.createTempDirectory("codex-saves"), true);
+    }
+
+    /**
+     * A server writing its games somewhere the test controls, so they can outlive it.
+     * @param saveDirectory Where the saved games go.
+     */
+    public ServerHarness(Path saveDirectory) throws Exception {
+        this(saveDirectory, false);
+    }
+
+    private ServerHarness(Path saveDirectory, boolean ownsSaveDirectory) throws Exception {
         try (ServerSocket probe = new ServerSocket(0)) {
             port = probe.getLocalPort();
         }
         lobby = new Lobby();
+        this.saveDirectory = saveDirectory;
+        this.ownsSaveDirectory = ownsSaveDirectory;
+        lobby.setGameStore(new GameStore(saveDirectory));
         lobby.initializeWelcomeSocket(port);
         Thread lobbyThread = new Thread(lobby::startLobby, "lobby");
         lobbyThread.setDaemon(true);
@@ -84,11 +107,22 @@ public class ServerHarness implements AutoCloseable {
         throw new AssertionError("No diagonal around the starter card accepted card " + cardId);
     }
 
+    /**
+     * @return Where this server writes its saved games.
+     */
+    public Path saveDirectory() {
+        return saveDirectory;
+    }
+
     @Override
     public void close() throws IOException {
         for (TestClient client : clients) {
             client.close();
         }
         lobby.shutdown();
+        if (!ownsSaveDirectory) return;
+        try (var paths = Files.walk(saveDirectory)) {
+            paths.sorted(Comparator.reverseOrder()).forEach(path -> path.toFile().delete());
+        }
     }
 }

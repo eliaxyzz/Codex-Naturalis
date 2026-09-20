@@ -7,6 +7,10 @@ import it.polimi.ingsw.network.ClientHandler;
 import it.polimi.ingsw.network.ServerWelcomeSocket;
 import it.polimi.ingsw.network.ServerNetworkObserver;
 import it.polimi.ingsw.server.controller.GameController;
+import it.polimi.ingsw.server.persistence.GameSnapshot;
+import it.polimi.ingsw.server.persistence.GameStore;
+import org.json.simple.JSONObject;
+import java.nio.file.Path;
 import it.polimi.ingsw.util.customexceptions.*;
 import it.polimi.ingsw.util.supportclasses.Request;
 import java.util.*;
@@ -21,6 +25,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import static it.polimi.ingsw.util.supportclasses.Constants.MAX_PLAYERS;
 import static it.polimi.ingsw.util.supportclasses.Constants.RECONNECT_TIMEOUT;
+import static it.polimi.ingsw.util.supportclasses.Constants.SAVE_DIRECTORY;
 import static it.polimi.ingsw.util.supportclasses.Constants.MIN_PLAYERS;
 
 /**
@@ -46,6 +51,7 @@ public class Lobby implements ServerNetworkObserver {
     private final LobbyRequestHandler lobbyRequestHandler;
     private volatile boolean running;
     private volatile long reconnectTimeout = RECONNECT_TIMEOUT;
+    private volatile GameStore gameStore = new GameStore(Path.of(SAVE_DIRECTORY));
 
     public Lobby() {
         connectedClients = new CopyOnWriteArrayList<>();
@@ -238,6 +244,47 @@ public class Lobby implements ServerNetworkObserver {
      * @param delayMillis How long to wait.
      * @return A handle to cancel it with.
      */
+    public GameStore getGameStore() {
+        return gameStore;
+    }
+
+    /**
+     * Points the lobby at a different directory for its saved games. The tests use this to keep
+     * out of the real one.
+     * @param gameStore Where saved games live.
+     */
+    public void setGameStore(GameStore gameStore) {
+        this.gameStore = gameStore;
+    }
+
+    /**
+     * Picks up every game that was left saved, so a restarted server comes back with them.
+     * Each one waits for its players to reconnect: nobody is connected to a game yet.
+     * @return How many games came back.
+     */
+    public int restoreSavedGames() {
+        int restored = 0;
+        for (JSONObject snapshot : gameStore.loadAll()) {
+            String gameName = String.valueOf(snapshot.get("gameName"));
+            try {
+                if (games.containsKey(gameName)) continue;
+                GameSnapshot.Restored saved = GameSnapshot.restore(snapshot);
+                GameController gameController = new GameController(this, saved.game(), gameName, saved.chatLog());
+                games.put(gameName, gameController);
+                //hold their names so nobody takes a seat that isn't theirs
+                takenUsernames.addAll(saved.game().getPlayerUsernames());
+                executorService.submit(gameController);
+                restored++;
+                LOG.info(() -> "Restored the saved game '" + gameName + "'");
+            } catch (RuntimeException e) {
+                //one unreadable save must not stop the server coming up
+                LOG.log(Level.WARNING, "Could not restore the saved game '" + gameName + "'", e);
+                gameStore.delete(gameName);
+            }
+        }
+        return restored;
+    }
+
     public long getReconnectTimeout() {
         return reconnectTimeout;
     }
@@ -300,6 +347,7 @@ public class Lobby implements ServerNetworkObserver {
     public void closeGame(String gameName) {
         makeUnavailable(gameName);
         games.remove(gameName);
+        gameStore.delete(gameName);
     }
 
     /**

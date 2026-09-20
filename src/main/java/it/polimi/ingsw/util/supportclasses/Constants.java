@@ -12,6 +12,9 @@ public final class Constants {
     public static final int LAST_STARTER_CARD_ID = 86;
     public static final int LAST_OBJECTIVE_CARD_ID = 102;
 
+    //where games are written down so a restarted server can pick them up again
+    public static final String SAVE_DIRECTORY = "saves";
+
     //in-game chat
     public static final int CHAT_HISTORY_SIZE = 100;
     public static final int MAX_CHAT_LENGTH = 200;

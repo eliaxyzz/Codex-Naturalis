@@ -5,6 +5,7 @@ import it.polimi.ingsw.network.ServerNetworkObserver;
 import it.polimi.ingsw.server.ServerLog;
 import it.polimi.ingsw.server.chat.ChatEntry;
 import it.polimi.ingsw.server.chat.ChatLog;
+import it.polimi.ingsw.server.persistence.GameSnapshot;
 import it.polimi.ingsw.server.lobby.Lobby;
 import it.polimi.ingsw.server.lobby.LobbyMessageGenerator;
 import it.polimi.ingsw.server.model.DrawSource;
@@ -42,7 +43,7 @@ public class GameController implements Runnable, ServerNetworkObserver {
     private final Lobby lobby;
     private final Game game;
     private final BlockingQueue<Runnable> tasks = new LinkedBlockingQueue<>();
-    private final ChatLog chatLog = new ChatLog();
+    private final ChatLog chatLog;
     private final GameRequestHandler gameRequestHandler;
     private final ServerMessageGenerator messageGenerator;
     private volatile boolean running = true;
@@ -50,9 +51,21 @@ public class GameController implements Runnable, ServerNetworkObserver {
     private ScheduledFuture<?> lastPlayerTimeout;
 
     public GameController(Lobby lobby, int numberOfPlayers, String gameName) {
+        this(lobby, new Game(numberOfPlayers), gameName, new ChatLog());
+    }
+
+    /**
+     * Picks a game back up from a save.
+     * @param lobby The lobby it belongs to.
+     * @param game The rebuilt game, with everyone in it disconnected.
+     * @param gameName Its name.
+     * @param chatLog The chat it had.
+     */
+    public GameController(Lobby lobby, Game game, String gameName, ChatLog chatLog) {
         this.gameName = gameName;
         this.lobby = lobby;
-        this.game = new Game(numberOfPlayers);
+        this.game = game;
+        this.chatLog = chatLog;
         this.messageGenerator = new ServerMessageGenerator(game);
         this.gameRequestHandler = new GameRequestHandler(this, messageGenerator, game);
         LOG.info(() -> "Game '" + gameName + "' is ready to receive players");
@@ -63,6 +76,9 @@ public class GameController implements Runnable, ServerNetworkObserver {
         while (running) {
             try {
                 tasks.take().run();
+                //everything that changes a game comes through here, so this is the only place
+                //that has to remember to write it down
+                persist();
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 return;
@@ -70,6 +86,21 @@ public class GameController implements Runnable, ServerNetworkObserver {
                 LOG.log(Level.WARNING, "Game '" + gameName + "': dropping a request that failed", e);
             }
         }
+    }
+
+    /**
+     * Writes the game down, or forgets it once there's nothing left to come back to.
+     */
+    private void persist() {
+        if (game.getGameState() == GameState.endGame || game.getGameState() == GameState.aClientDisconnected) {
+            lobby.getGameStore().delete(gameName);
+            return;
+        }
+        lobby.getGameStore().save(gameName, GameSnapshot.of(game, gameName, chatLog));
+    }
+
+    public ChatLog getChatLog() {
+        return chatLog;
     }
 
     @Override
@@ -126,9 +157,9 @@ public class GameController implements Runnable, ServerNetworkObserver {
         LOG.info(() -> "In game '" + gameName + "' player '" + username + "' is suspended");
         broadcast(messageGenerator.playerSuspendedMessage(username));
         if (game.connectedPlayerCount() == 0) {
-            LOG.info(() -> "Nobody is left in the game '" + gameName + "': game is closed");
-            lobby.releaseUsernames(game.getTurnOrder());
-            closeGame();
+            //the game stays on disk and in the lobby, waiting for somebody to come back to it
+            LOG.info(() -> "Nobody is left in the game '" + gameName + "': waiting for them to come back");
+            cancelLastPlayerTimeout();
             return;
         }
         //don't leave the turn parked on someone who isn't there

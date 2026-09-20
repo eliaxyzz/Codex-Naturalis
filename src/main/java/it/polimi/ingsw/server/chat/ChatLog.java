@@ -37,4 +37,11 @@ public class ChatLog {
     public int size() {
         return entries.size();
     }
+
+    /**
+     * @return Everything said so far, oldest first.
+     */
+    public List<ChatEntry> entries() {
+        return List.copyOf(entries);
+    }
 }

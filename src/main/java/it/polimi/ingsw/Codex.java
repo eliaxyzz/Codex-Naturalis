@@ -35,6 +35,8 @@ public class Codex {
                 System.out.println("unexpected argument: " + args[1]);
         } else if (args[0].equals("server")) {
             codex.setLobby(new Lobby());
+            int restored = codex.getLobby().restoreSavedGames();
+            if (restored > 0) System.out.println("Picked up " + restored + " saved game(s), waiting for their players.");
             ServerView.getInstance(codex.getLobby());
             codex.getLobby().startLobby();
         } else {

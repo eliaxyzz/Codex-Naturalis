@@ -39,19 +39,36 @@ public class Game {
     private final List<String> turnOrder = new ArrayList<>();
 
     public Game(int numberOfPlayers) {
-        this.setNumberOfPlayers(numberOfPlayers);
-        players = new ConcurrentHashMap<>();
-        objectiveCardDeck = new ObjectiveCardDeck();
-        resourceCardDeck = new ResourceCardDeck();
-        goldCardDeck = new GoldCardDeck();
-        starterCardDeck = new StarterCardDeck();
-        commonObjectives = new ArrayList<>();
-        availableTokens = new ArrayList<>(Arrays.asList(Token.red, Token.yellow, Token.green, Token.blue));
+        this(numberOfPlayers, new ObjectiveCardDeck(), new ResourceCardDeck(), new GoldCardDeck(),
+                new StarterCardDeck(), Arrays.asList(Token.red, Token.yellow, Token.green, Token.blue));
         try {
             commonObjectives.add(objectiveCardDeck.directDraw());
             commonObjectives.add(objectiveCardDeck.directDraw());
         } catch (EmptyDeckException ignored) {
         }
+    }
+
+    /**
+     * Builds a game around decks and tokens that already exist, for restoring a saved one.
+     * Nothing is drawn or shuffled here: the caller puts back the common objectives, the
+     * players and the turn.
+     * @param numberOfPlayers How many players the game seats.
+     * @param objectiveCardDeck The objective deck as it was left.
+     * @param resourceCardDeck The resource deck as it was left.
+     * @param goldCardDeck The gold deck as it was left.
+     * @param starterCardDeck The starter deck as it was left.
+     * @param availableTokens The colours nobody has taken.
+     */
+    public Game(int numberOfPlayers, ObjectiveCardDeck objectiveCardDeck, ResourceCardDeck resourceCardDeck,
+                GoldCardDeck goldCardDeck, StarterCardDeck starterCardDeck, List<Token> availableTokens) {
+        this.setNumberOfPlayers(numberOfPlayers);
+        players = new ConcurrentHashMap<>();
+        this.objectiveCardDeck = objectiveCardDeck;
+        this.resourceCardDeck = resourceCardDeck;
+        this.goldCardDeck = goldCardDeck;
+        this.starterCardDeck = starterCardDeck;
+        commonObjectives = new ArrayList<>();
+        this.availableTokens = new ArrayList<>(availableTokens);
         gameState = GameState.waitingForPlayers;
     }
     public GameState getGameState() {
@@ -84,6 +101,45 @@ public class Game {
         Player player = new Player(this);
         players.put(username, player);
         return player;
+    }
+
+    /**
+     * Seats a player with the colour they already had, for restoring a saved game.
+     * @param username The player's name.
+     * @param token The colour they were playing.
+     * @return The seated player.
+     */
+    public Player addPlayer(String username, Token token) {
+        Player player = new Player(this, token);
+        players.put(username, player);
+        return player;
+    }
+
+    /**
+     * Puts back the two objectives the whole table plays for.
+     * @param objectives The common objectives.
+     */
+    public void restoreCommonObjectives(List<ObjectiveCard> objectives) {
+        commonObjectives.clear();
+        commonObjectives.addAll(objectives);
+    }
+
+    /**
+     * Puts back the turn exactly where it was.
+     * @param usernamesInTurnOrder Every player's username, first player first.
+     * @param turnCounter Whose turn it is, as an index into that list.
+     */
+    public void restoreTurn(List<String> usernamesInTurnOrder, int turnCounter) {
+        turnOrder.clear();
+        turnOrder.addAll(usernamesInTurnOrder);
+        this.turnCounter = turnOrder.isEmpty() ? 0 : Math.floorMod(turnCounter, turnOrder.size());
+    }
+
+    /**
+     * @return Whose turn it is, as an index into the turn order.
+     */
+    public int getTurnCounter() {
+        return turnCounter;
     }
 
     /**
@@ -159,6 +215,13 @@ public class Game {
             if (!player.isStarterCardOrientationSelected() || player.getSecretObjective() == null) return false;
         }
         return true;
+    }
+
+    /**
+     * @return The names of everyone seated, in no particular order.
+     */
+    public java.util.Set<String> getPlayerUsernames() {
+        return players.keySet();
     }
 
     public ArrayList<Player> getPlayers() {

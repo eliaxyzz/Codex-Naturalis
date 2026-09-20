@@ -30,8 +30,17 @@ public class Player implements Comparable<Player> {
     private int numOfCompletedObjectiveCards;
 
     public Player(Game game) {
+        this(game, game.getRandomToken());
+    }
+
+    /**
+     * Rebuilds a player with the colour they already had, for restoring a saved game.
+     * @param game The game they're in.
+     * @param token The colour they were playing.
+     */
+    public Player(Game game, Token token) {
         this.game = game;
-        this.token = game.getRandomToken();
+        this.token = token;
         this.score = 0;
         this.gamefield = new GameField();
         this.hand = new ArrayList<>();
@@ -87,6 +96,27 @@ public class Player implements Comparable<Player> {
     }
 
     public void setDrawnObjectiveCards(ObjectiveCard[] drawnObjectiveCards) {this.drawnObjectiveCards = drawnObjectiveCards;}
+
+    public void setSecretObjective(ObjectiveCard secretObjective) {
+        this.secretObjective = secretObjective;
+    }
+
+    /**
+     * Puts back the things that can't be worked out again from the game field.
+     * @param score Their score.
+     * @param ready Whether they had declared themselves ready.
+     * @param starterCardOrientationSelected Whether they had already picked a starter card side.
+     * @param alreadyPlaced Whether they had already placed this turn.
+     * @param numOfCompletedObjectiveCards How many objectives they had completed, for the tie-break.
+     */
+    public void restoreProgress(int score, boolean ready, boolean starterCardOrientationSelected,
+                                boolean alreadyPlaced, int numOfCompletedObjectiveCards) {
+        this.score = score;
+        this.isReady = ready;
+        this.starterCardOrientationSelected = starterCardOrientationSelected;
+        this.alreadyPlaced = alreadyPlaced;
+        this.numOfCompletedObjectiveCards = numOfCompletedObjectiveCards;
+    }
 
     public boolean isReady() {
         return isReady;

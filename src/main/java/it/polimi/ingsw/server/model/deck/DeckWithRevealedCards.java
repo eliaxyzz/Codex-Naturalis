@@ -19,6 +19,18 @@ public abstract class DeckWithRevealedCards<T extends Card> extends Deck<T>{
         rightRevealedCard = topCardOrNull();
     }
 
+    /**
+     * Rebuilds a saved deck: the order and the two revealed cards come back as they were.
+     * @param cards What is left in the deck, top card first.
+     * @param leftRevealedCard The card revealed on the left, or null if that slot ran dry.
+     * @param rightRevealedCard The card revealed on the right, or null if that slot ran dry.
+     */
+    protected DeckWithRevealedCards(List<T> cards, T leftRevealedCard, T rightRevealedCard) {
+        super(cards, false);
+        this.leftRevealedCard = leftRevealedCard;
+        this.rightRevealedCard = rightRevealedCard;
+    }
+
     public int getLeftRevealedCardID() {
         if (leftRevealedCard == null) { return 0;}
         return leftRevealedCard.getId();

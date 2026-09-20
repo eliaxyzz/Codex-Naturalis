@@ -16,6 +16,8 @@ module LB08 {
     exports it.polimi.ingsw.server.model.card.ObjectiveCardStrategy;
     exports it.polimi.ingsw.server.model.deck;
     exports it.polimi.ingsw.server.controller;
+    exports it.polimi.ingsw.server.chat;
+    exports it.polimi.ingsw.server.persistence;
     exports it.polimi.ingsw.server.view;
     exports it.polimi.ingsw.client.model;
     exports it.polimi.ingsw.client.controller;

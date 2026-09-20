@@ -18,8 +18,23 @@ public abstract class Deck<T extends Card> {
      *              caller's list stays untouched.
      */
     protected Deck(List<T> cards) {
+        this(cards, true);
+    }
+
+    /**
+     * @param cards The cards the deck starts with.
+     * @param shuffle false when restoring a saved game: the order it was left in is the point.
+     */
+    protected Deck(List<T> cards, boolean shuffle) {
         this.cards = new ArrayList<>(cards);
-        Collections.shuffle(this.cards);
+        if (shuffle) Collections.shuffle(this.cards);
+    }
+
+    /**
+     * @return The ids of the cards still in the deck, top card first.
+     */
+    public List<Integer> remainingCardIds() {
+        return cards.stream().map(Card::getId).toList();
     }
 
     /**
