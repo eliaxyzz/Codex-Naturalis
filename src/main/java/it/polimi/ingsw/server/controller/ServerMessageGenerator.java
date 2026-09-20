@@ -56,7 +56,45 @@ public class ServerMessageGenerator {
         message.put("commonObjective1", String.valueOf(game.getCommonObjectives().getFirst().getId()));
         message.put("commonObjective2", String.valueOf(game.getCommonObjectives().getLast().getId()));
         message.put("firstPlayer", gameController.getTurnPlayerUsername());
+        //a player who dropped between placing and drawing has to come back into the drawing step
+        message.put("alreadyPlaced", String.valueOf(player.hasAlreadyPlaced()));
         return message;
+    }
+
+    /**
+     * Tells everyone that a player lost their connection and the game is going on without them.
+     * @param username The player that went away.
+     * @return The message.
+     */
+    public JSONObject playerSuspendedMessage(String username) {
+        Map<String,String> jsonMap = new HashMap<>();
+        jsonMap.put("message", "playerSuspended");
+        jsonMap.put("username", username);
+        return new JSONObject(jsonMap);
+    }
+
+    /**
+     * Tells everyone that a player came back.
+     * @param username The player that came back.
+     * @return The message.
+     */
+    public JSONObject playerResumedMessage(String username) {
+        Map<String,String> jsonMap = new HashMap<>();
+        jsonMap.put("message", "playerResumed");
+        jsonMap.put("username", username);
+        return new JSONObject(jsonMap);
+    }
+
+    /**
+     * Sent to the only player left once nobody came back in time.
+     * @param username The winner.
+     * @return The message.
+     */
+    public JSONObject wonByDefaultMessage(String username) {
+        Map<String,String> jsonMap = new HashMap<>();
+        jsonMap.put("message", "gameWonByDefault");
+        jsonMap.put("username", username);
+        return new JSONObject(jsonMap);
     }
 
     /**
@@ -181,46 +219,24 @@ public class ServerMessageGenerator {
      * This message sends to the players their final scores when the game is ended.
      * @return The final scores.
      */
-    public JSONObject leaderBoardMessage (GameController gameController, ArrayList<ClientHandler> clientHandlers) {
+    public JSONObject leaderBoardMessage (List<String> rankedUsernames) {
+        //players who lost their connection are ranked too, so the slots go by username
+        String[] positions = {"first", "second", "third", "fourth"};
         JSONObject message = new JSONObject();
         message.put("message", "leaderBoard");
-        if(!clientHandlers.isEmpty()) {
+        for (int i = 0; i < positions.length; i++) {
+            if (i >= rankedUsernames.size()) {
+                message.put(positions[i], null);
+                continue;
+            }
+            String username = rankedUsernames.get(i);
+            Player player = game.getPlayer(username);
             Map<String,String> jsonMap = new HashMap<>();
-            jsonMap.put("username",clientHandlers.getFirst().getUsername());
-            jsonMap.put("score", String.valueOf( gameController.getCurrentPlayer(clientHandlers.getFirst()).getScore()));
-            jsonMap.put("solvedObjectives" , String.valueOf(gameController.getCurrentPlayer(clientHandlers.getFirst()).getNumOfCompletedObjectiveCards()));
-            JSONObject player = new JSONObject(jsonMap);
-            message.put("first", player);
+            jsonMap.put("username", username);
+            jsonMap.put("score", String.valueOf(player.getScore()));
+            jsonMap.put("solvedObjectives", String.valueOf(player.getNumOfCompletedObjectiveCards()));
+            message.put(positions[i], new JSONObject(jsonMap));
         }
-        else message.put("first", null);
-        if(clientHandlers.size()>= 2) {
-            Map<String,String> jsonMap = new HashMap<>();
-            jsonMap.put("username",clientHandlers.get(1).getUsername());
-            jsonMap.put("score", String.valueOf( gameController.getCurrentPlayer(clientHandlers.get(1)).getScore()));
-            jsonMap.put("solvedObjectives" , String.valueOf(gameController.getCurrentPlayer(clientHandlers.get(1)).getNumOfCompletedObjectiveCards()));
-            JSONObject player = new JSONObject(jsonMap);
-            message.put("second", player);
-        }
-        else message.put("second", null);
-
-        if(clientHandlers.size()>= 3) {
-            Map<String,String> jsonMap = new HashMap<>();
-            jsonMap.put("username",clientHandlers.get(2).getUsername());
-            jsonMap.put("score", String.valueOf( gameController.getCurrentPlayer(clientHandlers.get(2)).getScore()));
-            jsonMap.put("solvedObjectives" , String.valueOf(gameController.getCurrentPlayer(clientHandlers.get(2)).getNumOfCompletedObjectiveCards()));
-            JSONObject player = new JSONObject(jsonMap);
-            message.put("third", player);
-        }
-        else message.put("third", null);
-        if(clientHandlers.size()>= 4) {
-            Map<String,String> jsonMap = new HashMap<>();
-            jsonMap.put("username", clientHandlers.get(3).getUsername());
-            jsonMap.put("score",  String.valueOf( gameController.getCurrentPlayer(clientHandlers.get(3)).getScore()));
-            jsonMap.put("solvedObjectives", String.valueOf(gameController.getCurrentPlayer(clientHandlers.get(3)).getNumOfCompletedObjectiveCards()));
-            JSONObject player = new JSONObject(jsonMap);
-            message.put("fourth", player);
-        }
-        else message.put("fourth", null);
         return message;
     }
 

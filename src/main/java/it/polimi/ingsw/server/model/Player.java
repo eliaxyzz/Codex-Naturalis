@@ -23,6 +23,7 @@ public class Player implements Comparable<Player> {
     private ObjectiveCard[] drawnObjectiveCards;
 
     private boolean isReady;
+    private boolean connected = true;
     private boolean starterCardOrientationSelected;
     private boolean alreadyPlaced;
     private int numOfCompletedObjectiveCards;
@@ -88,6 +89,17 @@ public class Player implements Comparable<Player> {
 
     public boolean isReady() {
         return isReady;
+    }
+
+    /**
+     * @return false while the player is away after losing their connection.
+     */
+    public boolean isConnected() {
+        return connected;
+    }
+
+    public void setConnected(boolean connected) {
+        this.connected = connected;
     }
 
     public int getNumOfCompletedObjectiveCards() {

@@ -15,9 +15,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import static it.polimi.ingsw.util.supportclasses.Constants.MAX_PLAYERS;
+import static it.polimi.ingsw.util.supportclasses.Constants.RECONNECT_TIMEOUT;
 import static it.polimi.ingsw.util.supportclasses.Constants.MIN_PLAYERS;
 
 /**
@@ -38,8 +41,11 @@ public class Lobby implements ServerNetworkObserver {
     private boolean welcomeSocketIsRunning = false;
     private int welcomeSocketPort;
     private final ExecutorService executorService;
+    //one timer thread for every game's reconnection window
+    private final ScheduledExecutorService scheduler;
     private final LobbyRequestHandler lobbyRequestHandler;
     private volatile boolean running;
+    private volatile long reconnectTimeout = RECONNECT_TIMEOUT;
 
     public Lobby() {
         connectedClients = new CopyOnWriteArrayList<>();
@@ -48,6 +54,11 @@ public class Lobby implements ServerNetworkObserver {
         takenUsernames = ConcurrentHashMap.newKeySet();
         tasks = new LinkedBlockingQueue<>();
         executorService = Executors.newCachedThreadPool();
+        scheduler = Executors.newSingleThreadScheduledExecutor(task -> {
+            Thread thread = new Thread(task, "lobby-scheduler");
+            thread.setDaemon(true);
+            return thread;
+        });
         lobbyRequestHandler = new LobbyRequestHandler(this);
         running = true;
 
@@ -171,6 +182,16 @@ public class Lobby implements ServerNetworkObserver {
     }
 
     /**
+     * Drops a dead connection without giving up the username: a suspended player still owns
+     * their name until their game ends.
+     * @param client The client that went away.
+     */
+    public void forgetConnection(ClientHandler client) {
+        connectedClients.remove(client);
+        client.shutdown();
+    }
+
+    /**
      * Allows the client to pick a username, the username is added to the taken usernames list to ensure the uniqueness.
      * @param username The chosen username.
      * @param client The client that is setting the username.
@@ -208,6 +229,60 @@ public class Lobby implements ServerNetworkObserver {
         availableGames.put(gameName,newGameController);
         newGameController.submitJoin(client, LobbyMessageGenerator.createdGameMessage());
         executorService.submit(newGameController);
+    }
+
+    /**
+     * Runs a task later, for the games' reconnection windows. The task is expected to hand the
+     * work straight to its game's queue: this thread must not touch game state itself.
+     * @param task What to run.
+     * @param delayMillis How long to wait.
+     * @return A handle to cancel it with.
+     */
+    public long getReconnectTimeout() {
+        return reconnectTimeout;
+    }
+
+    /**
+     * Shortens the window games wait for absent players. Only the tests need this.
+     * @param reconnectTimeout The new window, in milliseconds.
+     */
+    public void setReconnectTimeout(long reconnectTimeout) {
+        this.reconnectTimeout = reconnectTimeout;
+    }
+
+    public ScheduledFuture<?> schedule(Runnable task, long delayMillis) {
+        return scheduler.schedule(task, delayMillis, TimeUnit.MILLISECONDS);
+    }
+
+    /**
+     * Frees the usernames a closed game was still holding for players that could have come back.
+     * @param usernames The usernames to release.
+     */
+    public void releaseUsernames(Collection<String> usernames) {
+        takenUsernames.removeAll(usernames);
+    }
+
+    /**
+     * Hands a returning client to the game it claims a seat in. The game answers with the full
+     * game state or with cannotReconnect.
+     * @param client The returning client.
+     * @param username The name it is claiming back.
+     * @param gameName The game it wants back into.
+     */
+    public void reconnect(ClientHandler client, String username, String gameName) {
+        GameController gameController = games.get(gameName);
+        if (gameController == null) {
+            client.send(LobbyMessageGenerator.cannotReconnectMessage("Game '" + gameName + "' is no longer running"));
+            return;
+        }
+        if (!gameController.getGame().isConnected(username) && gameController.getGame().getPlayer(username) != null) {
+            //the name is still reserved for them, so hand it over from their throwaway guest name
+            String guestName = client.getUsername();
+            if (guestName != null) takenUsernames.remove(guestName);
+            gameController.submitReconnect(client, username);
+            return;
+        }
+        client.send(LobbyMessageGenerator.cannotReconnectMessage("There's nobody called '" + username + "' to come back as"));
     }
 
     /**
@@ -255,6 +330,7 @@ public class Lobby implements ServerNetworkObserver {
         if (serverWelcomeSocket != null) {
             serverWelcomeSocket.shutdown();
         }
+        scheduler.shutdownNow();
         if (executorService != null) {
             //games sit in tasks.take() and only stop on interrupt
             executorService.shutdownNow();

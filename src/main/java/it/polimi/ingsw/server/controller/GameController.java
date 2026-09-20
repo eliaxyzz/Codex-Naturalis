@@ -18,6 +18,8 @@ import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -40,6 +42,8 @@ public class GameController implements Runnable, ServerNetworkObserver {
     private final GameRequestHandler gameRequestHandler;
     private final ServerMessageGenerator messageGenerator;
     private volatile boolean running = true;
+    //set and cancelled on the game thread only
+    private ScheduledFuture<?> lastPlayerTimeout;
 
     public GameController(Lobby lobby, int numberOfPlayers, String gameName) {
         this.gameName = gameName;
@@ -83,10 +87,119 @@ public class GameController implements Runnable, ServerNetworkObserver {
     public void notifyConnectionLoss(ClientHandler client) {
         LOG.info(() -> "In game '" + gameName + "' player '" + client.getUsername() + "' disconnected");
         tasks.add(() -> {
+            if (game.isUnderWay() && clientHandlers.contains(client)) {
+                //keep their seat warm: they can come back to it
+                suspendPlayer(client);
+                return;
+            }
             removePlayer(client);
             //the lobby still has to forget the client (username, connected list)
             lobby.notifyConnectionLoss(client);
         });
+    }
+
+    /**
+     * Queues a reconnection. The client is answered from the game thread: the full game state
+     * if it got back in, cannotReconnect otherwise.
+     * @param client The returning client, still carrying its guest username.
+     * @param username The name it is claiming back.
+     */
+    public void submitReconnect(ClientHandler client, String username) {
+        tasks.add(() -> reconnect(client, username));
+    }
+
+    /**
+     * The player is gone but the game carries on without them. Their username stays reserved,
+     * so the lobby is deliberately not told about this.
+     */
+    private void suspendPlayer(ClientHandler client) {
+        String username = client.getUsername();
+        clientHandlers.remove(client);
+        game.suspendPlayer(username);
+        client.setGame(null);
+        //the lobby drops the dead connection but keeps the name reserved for their return
+        lobby.forgetConnection(client);
+        LOG.info(() -> "In game '" + gameName + "' player '" + username + "' is suspended");
+        broadcast(messageGenerator.playerSuspendedMessage(username));
+        if (game.connectedPlayerCount() == 0) {
+            LOG.info(() -> "Nobody is left in the game '" + gameName + "': game is closed");
+            lobby.releaseUsernames(game.getTurnOrder());
+            closeGame();
+            return;
+        }
+        //don't leave the turn parked on someone who isn't there
+        if (username.equals(game.getTurnPlayer())) {
+            passTurn(game.getPlayer(username));
+        }
+        startLastPlayerTimeoutIfAlone();
+    }
+
+    /**
+     * Puts a returning player back at their seat and sends them the whole game state.
+     */
+    private void reconnect(ClientHandler client, String username) {
+        if (!game.isUnderWay() || game.getPlayer(username) == null || game.isConnected(username)) {
+            client.send(LobbyMessageGenerator.cannotReconnectMessage("There's nobody to come back as in '" + gameName + "'"));
+            return;
+        }
+        client.setUsername(username);
+        client.setGame(this);
+        if (client.isClosed()) {
+            client.setGame(null);
+            return;
+        }
+        //back at the same spot in the turn order, so score lists keep coming out in that order
+        clientHandlers.add(Math.min(turnOrderIndexOf(username), clientHandlers.size()), client);
+        game.resumePlayer(username);
+        cancelLastPlayerTimeout();
+        LOG.info(() -> "Player '" + username + "' rejoined the game '" + gameName + "'");
+        Player player = game.getPlayer(username);
+        client.send(messageGenerator.startGameMessage(this, player));
+        client.send(messageGenerator.updatedScoresMessage(this));
+        if (game.getGameState() == GameState.lastRound) {
+            client.send(messageGenerator.lastRoundMessage("the game was already at its last round"));
+        }
+        broadcast(messageGenerator.playerResumedMessage(username));
+    }
+
+    private int turnOrderIndexOf(String username) {
+        List<String> turnOrder = game.getTurnOrder();
+        int index = turnOrder.indexOf(username);
+        if (index < 0) return clientHandlers.size();
+        //count only the seats before this one that are actually occupied right now
+        int occupied = 0;
+        for (int i = 0; i < index; i++) {
+            if (game.isConnected(turnOrder.get(i))) occupied++;
+        }
+        return occupied;
+    }
+
+    /**
+     * With a single player left there's no game to play: give the others a while to come back,
+     * and hand them the win if nobody does.
+     */
+    private void startLastPlayerTimeoutIfAlone() {
+        if (game.connectedPlayerCount() != 1 || lastPlayerTimeout != null) return;
+        long timeout = lobby.getReconnectTimeout();
+        LOG.info(() -> "Game '" + gameName + "' has one player left, waiting " + timeout + "ms for the others");
+        //fire onto the game's own queue: the game state is only ever touched from that thread
+        lastPlayerTimeout = lobby.schedule(() -> tasks.add(this::awardGameToLastPlayer), timeout);
+    }
+
+    private void cancelLastPlayerTimeout() {
+        if (lastPlayerTimeout == null) return;
+        lastPlayerTimeout.cancel(false);
+        lastPlayerTimeout = null;
+    }
+
+    private void awardGameToLastPlayer() {
+        //someone may have come back, or the game may have ended, while the timer was pending
+        if (!game.isUnderWay() || game.connectedPlayerCount() != 1 || clientHandlers.isEmpty()) return;
+        lastPlayerTimeout = null;
+        ClientHandler winner = clientHandlers.getFirst();
+        LOG.info(() -> "Game '" + gameName + "' goes to '" + winner.getUsername() + "': nobody else came back");
+        game.setGameState(GameState.endGame);
+        winner.send(messageGenerator.wonByDefaultMessage(winner.getUsername()));
     }
 
     public String getGameName() {
@@ -161,9 +274,14 @@ public class GameController implements Runnable, ServerNetworkObserver {
         }
         if (clientHandlers.isEmpty()) {
             LOG.info(() -> "There are no more players in the game '" + gameName + "': game is closed");
-            lobby.closeGame(gameName);
-            running = false;
+            closeGame();
         }
+    }
+
+    private void closeGame() {
+        cancelLastPlayerTimeout();
+        lobby.closeGame(gameName);
+        running = false;
     }
 
     public void ready(ClientHandler client) {
@@ -231,7 +349,7 @@ public class GameController implements Runnable, ServerNetworkObserver {
         startLastRoundIfDue();
         broadcast(messageGenerator.updatedScoresMessage(this));
         LOG.info(() -> "In game '" + gameName + "' player '" + client.getUsername() + "' placed the card " + placeableCardId + " at X:" + x + " Y:" + y);
-        if (game.getGameState() == GameState.lastRound) passTurn(client);
+        if (game.getGameState() == GameState.lastRound) passTurn(getCurrentPlayer(client));
     }
 
     /**
@@ -248,7 +366,7 @@ public class GameController implements Runnable, ServerNetworkObserver {
         player.addToHand(game.draw(source));
         LOG.info(() -> "In game '" + gameName + "' player '" + client.getUsername() + "' has drawn " + source.description());
         startLastRoundIfDue();
-        passTurn(client);
+        passTurn(player);
     }
 
     private void startLastRoundIfDue() {
@@ -262,8 +380,8 @@ public class GameController implements Runnable, ServerNetworkObserver {
      * Ends the current player's turn, tells everyone whose turn it is and, if that closed
      * the last round, sends the final leaderboard.
      */
-    private void passTurn(ClientHandler client) {
-        getCurrentPlayer(client).clearTurnState();
+    private void passTurn(Player player) {
+        player.clearTurnState();
         boolean gameOver = game.passTurn();
         broadcast(messageGenerator.turnPlayerUpdateMessage(this));
         if (gameOver) {
@@ -273,17 +391,18 @@ public class GameController implements Runnable, ServerNetworkObserver {
     }
 
     private void sendLeaderboard() {
-        ArrayList<ClientHandler> ranking = new ArrayList<>(clientHandlers);
-        for (ClientHandler c : ranking) {
-            getCurrentPlayer(c).calculateFinalScore();
+        //everyone who took a seat is scored, including players who never made it back
+        ArrayList<String> ranking = new ArrayList<>(game.getTurnOrder());
+        for (String username : ranking) {
+            game.getPlayer(username).calculateFinalScore();
         }
-        ranking.sort((c1, c2) -> getCurrentPlayer(c1).compareTo(getCurrentPlayer(c2)));
-        broadcast(messageGenerator.leaderBoardMessage(this, ranking));
+        ranking.sort((a, b) -> game.getPlayer(a).compareTo(game.getPlayer(b)));
+        broadcast(messageGenerator.leaderBoardMessage(ranking));
         LOG.info(() -> {
             StringBuilder leaderboard = new StringBuilder("Game '" + gameName + "' leaderboard:");
             for (int i = 0; i < ranking.size(); i++) {
-                Player player = getCurrentPlayer(ranking.get(i));
-                leaderboard.append(System.lineSeparator()).append(i + 1).append(": ").append(ranking.get(i).getUsername())
+                Player player = game.getPlayer(ranking.get(i));
+                leaderboard.append(System.lineSeparator()).append(i + 1).append(": ").append(ranking.get(i))
                         .append(" ").append(player.getScore()).append(" points (")
                         .append(player.getNumOfCompletedObjectiveCards()).append(" objectives completed)");
             }

@@ -12,6 +12,18 @@ import java.util.Map;
 public class LobbyMessageGenerator {
 
     /**
+     * Sent when a client asked to rejoin a game it can't rejoin.
+     * @param reason Why the reconnection was refused.
+     * @return The message.
+     */
+    public static JSONObject cannotReconnectMessage(String reason) {
+        JSONObject message = new JSONObject();
+        message.put("message", "cannotReconnect");
+        message.put("reason", reason);
+        return message;
+    }
+
+    /**
      * Creates a message to be sent after a successful join in a lobby.
      * @return JSON message
      */

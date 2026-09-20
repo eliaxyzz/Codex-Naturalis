@@ -29,6 +29,7 @@ public class LobbyRequestHandler {
         commands.put("setUp", (client, message) -> setUpGame(message, client));
         commands.put("join", (client, message) -> joinGame(message, client));
         commands.put("leave", (client, message) -> leaveLobby(client));
+        commands.put("reconnect", (client, message) -> reconnect(message, client));
     }
     /**
      * Handles the incoming request from a client
@@ -105,6 +106,15 @@ public class LobbyRequestHandler {
             clientHandler.send(LobbyMessageGenerator.gameDoesNotExistMessage());
         }
 
+    }
+
+    /**
+     * processes a client's request to get back into a game it dropped out of
+     * @param message json object message
+     * @param clientHandler client handler of client
+     */
+    private void reconnect(JSONObject message, ClientHandler clientHandler) {
+        lobby.reconnect(clientHandler, RequestFields.getString(message, "username"), RequestFields.getString(message, "gameName"));
     }
 
     /**

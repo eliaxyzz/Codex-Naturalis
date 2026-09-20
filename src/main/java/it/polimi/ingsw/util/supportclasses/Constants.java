@@ -12,6 +12,12 @@ public final class Constants {
     public static final int LAST_STARTER_CARD_ID = 86;
     public static final int LAST_OBJECTIVE_CARD_ID = 102;
 
+    //how long a game waits with a single player left before awarding it to them
+    public static final int RECONNECT_TIMEOUT = 60000;
+    //how the client retries after a mid-game drop
+    public static final int RECONNECT_RETRY_INTERVAL = 3000;
+    public static final int RECONNECT_RETRY_ATTEMPTS = 20;
+
     public static final int PING_INTERVAL = 2000; //defines the time between ping messages in milliseconds
     public static final int PING_TRIES = 3; //defines the number of ping that have no response before determining the connection is lost
 }

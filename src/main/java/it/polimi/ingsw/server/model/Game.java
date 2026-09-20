@@ -87,6 +87,39 @@ public class Game {
     }
 
     /**
+     * Marks a player as away after a lost connection. They keep their seat, score, cards and
+     * token, so they can pick the game up again where they left it.
+     */
+    public void suspendPlayer(String username) {
+        Player player = players.get(username);
+        if (player != null) player.setConnected(false);
+    }
+
+    /**
+     * Marks a player as back.
+     */
+    public void resumePlayer(String username) {
+        Player player = players.get(username);
+        if (player != null) player.setConnected(true);
+    }
+
+    public boolean isConnected(String username) {
+        Player player = players.get(username);
+        return player != null && player.isConnected();
+    }
+
+    /**
+     * @return How many players are currently reachable.
+     */
+    public int connectedPlayerCount() {
+        int connected = 0;
+        for (Player player : players.values()) {
+            if (player.isConnected()) connected++;
+        }
+        return connected;
+    }
+
+    /**
      * Takes the player out of the game and makes their token available again.
      */
     public void removePlayer(String username) {
@@ -161,6 +194,13 @@ public class Game {
     }
 
     /**
+     * @return Every player's username in turn order, first player first. Empty before play starts.
+     */
+    public List<String> getTurnOrder() {
+        return Collections.unmodifiableList(turnOrder);
+    }
+
+    /**
      * @return The username of the player whose turn it is, or null before play starts.
      */
     public String getTurnPlayer() {
@@ -177,8 +217,15 @@ public class Game {
      * @return true if this ended the game.
      */
     public boolean passTurn() {
-        turnCounter = (turnCounter + 1) % turnOrder.size();
-        if (gameState == GameState.lastRound && turnCounter == 0) {
+        if (turnOrder.isEmpty()) return false;
+        //skipping can jump straight over index 0, so the wrap is tracked instead of inferred from it
+        boolean wrapped = false;
+        for (int skipped = 0; skipped < turnOrder.size(); skipped++) {
+            turnCounter = (turnCounter + 1) % turnOrder.size();
+            if (turnCounter == 0) wrapped = true;
+            if (isConnected(getTurnPlayer())) break;
+        }
+        if (gameState == GameState.lastRound && wrapped) {
             gameState = GameState.endGame;
             return true;
         }

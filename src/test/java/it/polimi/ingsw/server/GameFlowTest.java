@@ -15,6 +15,7 @@ class GameFlowTest {
     private TestClient bob;
     private TestClient first;
     private TestClient second;
+    private String secondUsername;
     private JSONObject firstStart;
 
     @BeforeEach
@@ -26,6 +27,7 @@ class GameFlowTest {
         boolean aliceFirst = "alice".equals(starts.getFirst().get("firstPlayer"));
         first = aliceFirst ? alice : bob;
         second = aliceFirst ? bob : alice;
+        secondUsername = aliceFirst ? "bob" : "alice";
         firstStart = aliceFirst ? starts.get(0) : starts.get(1);
     }
 
@@ -78,22 +80,28 @@ class GameFlowTest {
     }
 
     @Test
-    void droppedConnectionMidGameClosesTheGameForTheOthers() throws Exception {
+    void droppedConnectionMidGameSuspendsThePlayerAndSparesTheGame() throws Exception {
         second.close();
         // a closed socket is an EOF on the server side, no need to wait for the pinger to give up
-        assertNotNull(first.await("closingGame", 1500));
-        assertEquals(0, first.countWithin("closingGame", 500), "closingGame must be broadcast once");
+        assertNotNull(first.await("playerSuspended", 1500));
+        assertEquals(0, first.countWithin("playerSuspended", 500), "playerSuspended must be broadcast once");
+        assertEquals(0, first.countWithin("closingGame", 300), "an accidental drop must not end the game");
     }
 
     @Test
-    void droppedClientIsForgottenByTheLobby() throws Exception {
+    void droppedClientIsForgottenByTheLobbyButKeepsItsName() throws Exception {
         second.close();
-        first.await("closingGame", 1500);
+        first.await("playerSuspended", 1500);
         long deadline = System.currentTimeMillis() + 2000;
         while (server.lobby().getConnectedClients().size() != 1 && System.currentTimeMillis() < deadline) {
             Thread.sleep(20);
         }
-        assertEquals(1, server.lobby().getConnectedClients().size());
+        assertEquals(1, server.lobby().getConnectedClients().size(), "the dead connection must be dropped");
+
+        //the name stays reserved so nobody can steal the seat they are coming back to
+        TestClient impostor = server.connect("impostor");
+        impostor.send("setUsername", "username", secondUsername);
+        assertNotNull(impostor.await("usernameAlreadyTaken"));
     }
 
     @Test
