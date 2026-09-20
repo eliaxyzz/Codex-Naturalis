@@ -2,14 +2,18 @@ package it.polimi.ingsw.client.view.CLI;
 
 import it.polimi.ingsw.client.model.*;
 import it.polimi.ingsw.client.view.utility.CardRepresentation;
-import it.polimi.ingsw.server.model.card.GoldCard;
-import it.polimi.ingsw.server.model.card.ResourceCard;
+import it.polimi.ingsw.server.model.json.JsonCardsReader;
+import it.polimi.ingsw.util.customexceptions.CannotOpenJSONException;
+import it.polimi.ingsw.util.customexceptions.InvalidIdException;
 import it.polimi.ingsw.util.supportclasses.ClientState;
 import it.polimi.ingsw.util.supportclasses.ConsoleColor;
 import it.polimi.ingsw.util.supportclasses.Resource;
 import org.json.simple.JSONObject;
 import java.io.InputStream;
 import java.util.*;
+import static it.polimi.ingsw.util.supportclasses.Constants.LAST_GOLD_CARD_ID;
+import static it.polimi.ingsw.util.supportclasses.Constants.LAST_STARTER_CARD_ID;
+import static it.polimi.ingsw.util.supportclasses.Constants.LAST_RESOURCE_CARD_ID;
 import static it.polimi.ingsw.util.supportclasses.ViewConstants.*;
 
 /**
@@ -151,7 +155,8 @@ public class Printer {
     public static void printCardInfo(int id, boolean facingUp) {
         CardPrinter cardPrinter = new CardPrinter(CLI_CARD_WIDTH, CLI_CARD_HEIGHT, CLI_CORNER_HEIGHT, CLI_CORNER_WIDTH);
         cardPrinter.loadCardRepresentation(id,facingUp);
-        if (id < 87) {
+        //objective cards already printed themselves, they have no card matrix
+        if (id <= LAST_STARTER_CARD_ID) {
             cardPrinter.printCard();
         }
     }
@@ -169,12 +174,12 @@ public class Printer {
         int goldDeckLeftCardId = deckModel.getGoldDeckLeftCardId();
         int goldDeckRightCardId = deckModel.getGoldDeckRightCardId();
 
-        System.out.println("1) Resource deck top card: #?? (" +  new ResourceCard(resourceDeckTopCardId).getCardKingdom().toSymbol() + ")");
-        System.out.println("2) Left revealed resource card: #"+ resourceDeckLeftCardId + " ("+ new ResourceCard(resourceDeckLeftCardId).getCardKingdom().toSymbol() +")");
-        System.out.println("3) Right revealed resource card: #"+ resourceDeckRightCardId + " ("+ new ResourceCard(resourceDeckRightCardId).getCardKingdom().toSymbol() +")");
-        System.out.println("4) Gold deck top card: #?? (" +  new GoldCard(goldDeckTopCardId).getCardKingdom().toSymbol() + ")");
-        System.out.println("5) Left revealed gold card: #"+ goldDeckLeftCardId + " ("+ new GoldCard(goldDeckLeftCardId).getCardKingdom().toSymbol() +")");
-        System.out.println("6) Right revealed gold card: #"+ goldDeckRightCardId + " ("+ new GoldCard(goldDeckRightCardId).getCardKingdom().toSymbol() +")");
+        System.out.println("1) Resource deck top card: " + hiddenCardDescription(resourceDeckTopCardId));
+        System.out.println("2) Left revealed resource card: " + cardDescription(resourceDeckLeftCardId));
+        System.out.println("3) Right revealed resource card: " + cardDescription(resourceDeckRightCardId));
+        System.out.println("4) Gold deck top card: " + hiddenCardDescription(goldDeckTopCardId));
+        System.out.println("5) Left revealed gold card: " + cardDescription(goldDeckLeftCardId));
+        System.out.println("6) Right revealed gold card: " + cardDescription(goldDeckRightCardId));
         System.out.println();
     }
 
@@ -321,7 +326,7 @@ public class Printer {
             pos_index++;
         }
 
-        Printer.printMessage(result,ConsoleColor.YELLOW);
+        if (!result.isEmpty()) Printer.printMessage(result, ConsoleColor.YELLOW);
     }
 
     /**
@@ -329,15 +334,15 @@ public class Printer {
      */
     public static void printScores(){
         ScoreBoardModel scoreBoardModel = ScoreBoardModel.getInstance();
-        HashMap<String,Integer> scores = scoreBoardModel.getScore();
+        Map<String,Integer> scores = scoreBoardModel.getScore();
 
         printMessage("ScoreBoard", ConsoleColor.YELLOW);
-        for(String username : scores.keySet()){
-
+        //insertion order is the turn order the server sent
+        for (Map.Entry<String, Integer> entry : scores.entrySet()) {
+            String username = entry.getKey();
             if (Objects.equals(PlayerModel.getInstance().getUsername(), username))
-                System.out.println("You: " + scores.get(username) + " points");
-
-            else System.out.println(username + ": " + scores.get(username) + " points");
+                System.out.println("You: " + entry.getValue() + " points");
+            else System.out.println(username + ": " + entry.getValue() + " points");
         }
     }
 
@@ -345,7 +350,7 @@ public class Printer {
         for (String[] strings : matrix) {
             for (String string : strings) {
                 if (string != null) {
-                    System.out.printf(string);
+                    System.out.print(string); //cell is data, not a format string
                 } else System.out.print("\t");
             }
             System.out.println();
@@ -353,21 +358,48 @@ public class Printer {
     }
 
 
-/**
- * Gets the ANSI code for the color corresponding to a card's kingdom based on its ID.
- * @param id The ID of the card.
- * @return The ANSI code for the card's kingdom color, or white if the ID corresponds to a card with no kingdom.
- */
+    /**
+     * Gets the ANSI code for the color corresponding to a card's kingdom based on its ID.
+     * @param id The ID of the card.
+     * @return The ANSI code for the card's kingdom color, or white if the ID corresponds to a card with no kingdom.
+     */
     private static String getColor(int id){
-        String cardColor;
-        if(id > 0 && id <= 40){
-            cardColor = new ResourceCard(id).getCardKingdom().toColor();
-        }
-        else if(id > 40 && id <= 80){
-            cardColor = new GoldCard(id).getCardKingdom().toColor();
-        }
-        else cardColor = ConsoleColor.WHITE;
+        Resource kingdom = kingdomOf(id);
+        return kingdom == Resource.none ? ConsoleColor.WHITE : kingdom.toColor();
+    }
 
-        return cardColor;
+    /**
+     * @return The id and kingdom of a card, or "empty" when the deck ran out (id 0).
+     */
+    private static String cardDescription(int id) {
+        if (id == 0) return "empty";
+        return "#" + id + " (" + kingdomOf(id).toSymbol() + ")";
+    }
+
+    /**
+     * Same, but keeps the id hidden: it's the face-down top of a deck.
+     */
+    private static String hiddenCardDescription(int id) {
+        if (id == 0) return "empty";
+        return "#?? (" + kingdomOf(id).toSymbol() + ")";
+    }
+
+    /**
+     * Reads a card's kingdom without building the card: this runs for every card on the board.
+     * @param id The card id.
+     * @return The kingdom, or Resource.none for ids that have none (starters, objectives, empty slots).
+     */
+    private static Resource kingdomOf(int id) {
+        try {
+            if (id > 0 && id <= LAST_RESOURCE_CARD_ID) {
+                return JsonCardsReader.cardKingdom(JsonCardsReader.RESOURCE_CARDS, id);
+            }
+            if (id > LAST_RESOURCE_CARD_ID && id <= LAST_GOLD_CARD_ID) {
+                return JsonCardsReader.cardKingdom(JsonCardsReader.GOLD_CARDS, id);
+            }
+        } catch (CannotOpenJSONException | InvalidIdException ignored) {
+            //nothing sensible to colour it with
+        }
+        return Resource.none;
     }
 }

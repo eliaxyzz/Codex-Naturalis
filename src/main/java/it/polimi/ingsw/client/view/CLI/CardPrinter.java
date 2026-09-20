@@ -4,6 +4,7 @@ import it.polimi.ingsw.server.model.card.*;
 import it.polimi.ingsw.util.supportclasses.ConsoleColor;
 import it.polimi.ingsw.util.supportclasses.Resource;
 import java.util.ArrayList;
+import static it.polimi.ingsw.util.supportclasses.Constants.*;
 
 /**
  * This class is responsible for generating a text-based representation of a Card object for the Codex game client CLI.
@@ -41,17 +42,18 @@ public class CardPrinter {
      * @param facingUp True if the card should be printed face-up, False for face-down.
      */
     public void loadCardRepresentation(int id, boolean facingUp) {
-        if (id <= 0 || id > 102) {
+        if (id <= 0 || id > LAST_OBJECTIVE_CARD_ID) {
             Printer.printMessage("ERROR: invalid card id", ConsoleColor.RED);
             return;
-        } 
-        if (id <= 40) {
+        }
+        if (id <= LAST_RESOURCE_CARD_ID) {
             loadResourceCard(id, facingUp);
-        } else if (id <= 80) {
+        } else if (id <= LAST_GOLD_CARD_ID) {
             loadGoldCard(id, facingUp);
-        } else if (id <= 86) {
+        } else if (id <= LAST_STARTER_CARD_ID) {
             loadStarterCard(id, facingUp);
         } else {
+            //objective cards print their own description, there's no card matrix to show
             loadObjectiveCard(id);
         }
     }

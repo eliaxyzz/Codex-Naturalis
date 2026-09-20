@@ -45,6 +45,18 @@ public class JsonCardsReader {
         }
     }
 
+    /**
+     * Reads only a card's kingdom, without building the card.
+     * @param file One of RESOURCE_CARDS, GOLD_CARDS, STARTER_CARDS.
+     * @param id The card id.
+     * @return The card's kingdom.
+     * @throws CannotOpenJSONException If the file can't be read.
+     * @throws InvalidIdException If there's no card with that id in that file.
+     */
+    public static Resource cardKingdom(String file, int id) throws CannotOpenJSONException, InvalidIdException {
+        return Resource.StringToResource(cardData(file, id).get("Kingdom").toString());
+    }
+
     private static JSONObject cardData(String file, int id) throws CannotOpenJSONException, InvalidIdException {
         JSONObject item = cardsIn(file).get(id);
         if (item == null) throw new InvalidIdException("invalid id: " + id);

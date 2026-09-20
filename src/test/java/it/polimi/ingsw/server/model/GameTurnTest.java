@@ -15,9 +15,8 @@ class GameTurnTest {
     @BeforeEach
     void setUp() {
         game = new Game(2);
-        game.getPlayersHashMap().put("alice", new Player(game));
-        bob = new Player(game);
-        game.getPlayersHashMap().put("bob", bob);
+        game.addPlayer("alice");
+        bob = game.addPlayer("bob");
         game.startPlaying(List.of("bob", "alice"));
     }
 

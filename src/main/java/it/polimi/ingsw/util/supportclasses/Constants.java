@@ -6,6 +6,12 @@ public final class Constants {
     public static final int MIN_PLAYERS = 2;
     public static final int MAX_PLAYERS = 4; //one per token colour
 
+    //card ids are laid out in contiguous ranges by type
+    public static final int LAST_RESOURCE_CARD_ID = 40;
+    public static final int LAST_GOLD_CARD_ID = 80;
+    public static final int LAST_STARTER_CARD_ID = 86;
+    public static final int LAST_OBJECTIVE_CARD_ID = 102;
+
     public static final int PING_INTERVAL = 2000; //defines the time between ping messages in milliseconds
     public static final int PING_TRIES = 3; //defines the number of ping that have no response before determining the connection is lost
 }

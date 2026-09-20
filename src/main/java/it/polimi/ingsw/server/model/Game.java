@@ -65,8 +65,6 @@ public class Game {
         return getAvailableTokens().removeFirst();
     }
 
-    public Map<String, Player> getPlayersHashMap() { return players;}
-
     public Player getPlayer(String username) {
         return players.get(username);
     }

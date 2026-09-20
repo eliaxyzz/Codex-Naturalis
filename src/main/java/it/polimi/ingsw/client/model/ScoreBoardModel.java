@@ -3,7 +3,8 @@ package it.polimi.ingsw.client.model;
 import it.polimi.ingsw.util.supportclasses.Token;
 import org.json.simple.JSONObject;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * This class represents an ObservableModel that keeps track of the scores, resources and final leaderboard information in a game.
@@ -11,8 +12,9 @@ import java.util.HashMap;
 public class ScoreBoardModel extends ObservableModel{
 
     private static final ScoreBoardModel instance = new ScoreBoardModel();
-    private HashMap<String, Integer> scores;
-    private HashMap<String, Token> tokens;
+    //insertion ordered: the server sends the scores in turn order
+    private Map<String, Integer> scores;
+    private Map<String, Token> tokens;
     private ArrayList<JSONObject> leaderboard;
 
     private int insectResourceCount;
@@ -23,10 +25,10 @@ public class ScoreBoardModel extends ObservableModel{
     private int scrollCount;
     private int inkPotCount;
 
-    public ScoreBoardModel() {
-        scores = new HashMap<>();
+    private ScoreBoardModel() {
+        scores = new LinkedHashMap<>();
         leaderboard = new ArrayList<>();
-        tokens = new HashMap<>();
+        tokens = new LinkedHashMap<>();
     }
 
     public static ScoreBoardModel getInstance(){
@@ -54,16 +56,16 @@ public class ScoreBoardModel extends ObservableModel{
      * Sets the players' scores and notifies any registered observers that the data has changed.
      * @param scores The HashMap containing the scores for each player.
      */
-    public void setScores(HashMap<String, Integer> scores){
+    public void setScores(Map<String, Integer> scores){
         this.scores = scores;
         notifyObservers();
     }
 
-    public HashMap<String, Integer> getScore(){
+    public Map<String, Integer> getScore(){
         return scores;
     }
 
-    public void setTokens(HashMap<String, Token> tokens){
+    public void setTokens(Map<String, Token> tokens){
         this.tokens = tokens;
     }
 

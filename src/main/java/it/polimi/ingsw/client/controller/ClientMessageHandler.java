@@ -11,6 +11,7 @@ import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Consumer;
 
@@ -230,8 +231,9 @@ public class ClientMessageHandler {
      */
     private void updateScores(JSONObject message) {
         //parsing the message...
-        HashMap<String, Integer> scores = new HashMap<>();
-        HashMap<String, Token> tokens = new HashMap<>();
+        //LinkedHashMap: the server lists the players in turn order and the views show them that way
+        Map<String, Integer> scores = new LinkedHashMap<>();
+        Map<String, Token> tokens = new LinkedHashMap<>();
         JSONArray scoresArray = (JSONArray) message.get("updatedScores");
         //updating the model...
         for (Object o : scoresArray) {
