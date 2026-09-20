@@ -4,7 +4,6 @@ import it.polimi.ingsw.server.controller.GameController;
 import it.polimi.ingsw.server.model.Game;
 import it.polimi.ingsw.server.model.GameField;
 import it.polimi.ingsw.server.model.Player;
-import it.polimi.ingsw.server.model.card.GoldCard;
 import it.polimi.ingsw.server.model.card.ObjectiveCard;
 import it.polimi.ingsw.server.model.card.ResourceCard;
 import it.polimi.ingsw.server.model.card.StarterCard;

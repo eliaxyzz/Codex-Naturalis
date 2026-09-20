@@ -60,6 +60,8 @@ public abstract class Connection implements NetworkInterface {
     @Override
     public void send(JSONObject message) {
         out.println(message.toJSONString());
+        //PrintWriter never throws: a failed write is the first sign the peer is gone, don't wait for the pinger
+        if (out.checkError()) connectionLossNotification();
     }
 
     @Override

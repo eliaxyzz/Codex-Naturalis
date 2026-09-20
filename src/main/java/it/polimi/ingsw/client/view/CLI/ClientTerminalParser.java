@@ -9,6 +9,8 @@ import it.polimi.ingsw.client.view.utility.CardRepresentation;
 import it.polimi.ingsw.util.cli.CommandParser;
 import it.polimi.ingsw.util.supportclasses.ClientState;
 import it.polimi.ingsw.util.supportclasses.ConsoleColor;
+import static it.polimi.ingsw.util.supportclasses.Constants.MAX_PLAYERS;
+import static it.polimi.ingsw.util.supportclasses.Constants.MIN_PLAYERS;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
@@ -23,6 +25,8 @@ import java.util.function.Consumer;
 public class ClientTerminalParser implements CommandParser {
     private static final Set<ClientState> IN_GAME = EnumSet.of(ClientState.PLACING_STATE, ClientState.DRAWING_STATE,
             ClientState.NOT_PLAYING_STATE, ClientState.LAST_ROUND_STATE);
+
+    private static final int MAX_USERNAME_LENGTH = 15;
 
     private final Map<String, Consumer<String[]>> commands = new HashMap<>();
 
@@ -129,8 +133,8 @@ public class ClientTerminalParser implements CommandParser {
             return;
         }
         String username = tokens[1].trim();
-        if (username.length() > 15) {
-            Printer.printMessage("The username must be less than 15 characters", ConsoleColor.RED);
+        if (username.length() > MAX_USERNAME_LENGTH) {
+            Printer.printMessage("The username must be at most " + MAX_USERNAME_LENGTH + " characters", ConsoleColor.RED);
         } else if (!username.matches("^[a-zA-Z0-9_]*$")) {
             parseError("invalid username");
         } else {
@@ -146,8 +150,8 @@ public class ClientTerminalParser implements CommandParser {
         }
         Integer numberOfPlayers = parseNumber(tokens[2], "number of players");
         if (numberOfPlayers == null) return;
-        if (numberOfPlayers < 2 || numberOfPlayers > 4) {
-            parseError("number of players must be between 2 and 4");
+        if (numberOfPlayers < MIN_PLAYERS || numberOfPlayers > MAX_PLAYERS) {
+            parseError("number of players must be between " + MIN_PLAYERS + " and " + MAX_PLAYERS);
             return;
         }
         ClientController.getInstance().sendSetUpGameMessage(tokens[1].trim(), numberOfPlayers);

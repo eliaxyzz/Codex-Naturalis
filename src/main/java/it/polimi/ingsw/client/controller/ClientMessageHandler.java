@@ -75,7 +75,7 @@ public class ClientMessageHandler {
      * @param message The message containing the updated username.
      */
     private void updateUsername(JSONObject message) {
-        PlayerModel.getInstance().setUsername(message.get("username").toString());
+        PlayerModel.getInstance().setUsername(RequestFields.getString(message, "username"));
     }
 
     /**
@@ -123,9 +123,9 @@ public class ClientMessageHandler {
      * @param message The JSONObject containing information about selectable cards. The message is expected to have fields for "starterCardID", "objectiveCardID1", and "objectiveCardID2".
      */
     private void updateSelectableCards (JSONObject message) {
-        int starterCardID = Integer.parseInt(message.get("starterCardID").toString());
-        int objectiveCardID1 = Integer.parseInt(message.get("objectiveCardID1").toString());
-        int objectiveCardID2 = Integer.parseInt(message.get("objectiveCardID2").toString());
+        int starterCardID = RequestFields.getInt(message, "starterCardID");
+        int objectiveCardID1 = RequestFields.getInt(message, "objectiveCardID1");
+        int objectiveCardID2 = RequestFields.getInt(message, "objectiveCardID2");
         SelectableCardsModel.getInstance().setSelectableCardsId(starterCardID,new int[]{objectiveCardID1, objectiveCardID2});
     }
 
@@ -135,15 +135,15 @@ public class ClientMessageHandler {
      */
     private void updateInitialBoardState (JSONObject message) {
         //parsing the message...
-        int objectiveCardID1 = Integer.parseInt( message.get("commonObjective1").toString());
-        int objectiveCardID2 = Integer.parseInt( message.get("commonObjective2").toString());
-        int secretObjectiveCardID = Integer.parseInt(message.get("secretObjectiveID").toString());
+        int objectiveCardID1 = RequestFields.getInt(message, "commonObjective1");
+        int objectiveCardID2 = RequestFields.getInt(message, "commonObjective2");
+        int secretObjectiveCardID = RequestFields.getInt(message, "secretObjectiveID");
         ArrayList<CardRepresentation> initialPlacementHistory = getPlacementHistoryArray((JSONArray) message.get("placementHistory"));
         ArrayList<CardRepresentation> initialHand = getHandArray((JSONArray) message.get("hand"));
         JSONObject decksJSON = (JSONObject) message.get("decks");
-        String firstPlayerUsername = message.get("firstPlayer").toString();
+        String firstPlayerUsername = RequestFields.getString(message, "firstPlayer");
         JSONObject resourcesJSON = (JSONObject) message.get("resources");
-        Token token = Token.parseToken(message.get("token").toString());
+        Token token = Token.parseToken(RequestFields.getString(message, "token"));
         //updating the model...
         PlayerModel.getInstance().setTurnPlayer(firstPlayerUsername);
         ObjectivesModel.getInstance().setCommonObjectives(new int[] {objectiveCardID1, objectiveCardID2});
@@ -194,7 +194,7 @@ public class ClientMessageHandler {
         //updating the model...
         GameFieldModel.getInstance().updatePlacementHistory(placementHistory);
         HandModel.getInstance().updateCardsInHand(updatedHand);
-        ScoreBoardModel.getInstance().setMyScore(Integer.parseInt(message.get("updatedScore").toString()));
+        ScoreBoardModel.getInstance().setMyScore(RequestFields.getInt(message, "updatedScore"));
         updateResourcesFromJSON(updatedResources);
 
         if (!PlayerModel.getInstance().isLastRound()) ClientStateModel.getInstance().setClientState(ClientState.DRAWING_STATE);
@@ -207,7 +207,7 @@ public class ClientMessageHandler {
     private void cannotPlaceHandler(JSONObject message) {
         HandModel.getInstance().rollback();
         GameFieldModel.getInstance().rollback(); //reloads the last update of the model
-        showError(message.get("reason").toString());
+        showError(RequestFields.getString(message, "reason"));
     }
 
     /**
@@ -215,7 +215,7 @@ public class ClientMessageHandler {
      * @param message The JSONObject containing the username of the turn player.
      */
     private void updateTurnPlayer (JSONObject message){
-        String currentTurnPlayer = message.get("player").toString();
+        String currentTurnPlayer = RequestFields.getString(message, "player");
 
         PlayerModel.getInstance().setTurnPlayer(currentTurnPlayer);
         if(PlayerModel.getInstance().getUsername().equals(currentTurnPlayer)) {
@@ -248,7 +248,7 @@ public class ClientMessageHandler {
      * @param message The JSONObject containing the last round message.
      */
     private void handleLastRound(JSONObject message){
-        updateClientState(ClientState.LAST_ROUND_STATE, message.get("reason").toString());
+        updateClientState(ClientState.LAST_ROUND_STATE, RequestFields.getString(message, "reason"));
         PlayerModel.getInstance().setLastTurn(true);
     }
 

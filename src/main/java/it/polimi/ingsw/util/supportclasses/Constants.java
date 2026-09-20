@@ -1,8 +1,8 @@
 package it.polimi.ingsw.util.supportclasses;
 
 public final class Constants {
-    public static int MAX_HAND_SIZE = 3;
-    public static int SCORE_GOAL = 20;
+    public static final int MAX_HAND_SIZE = 3;
+    public static final int SCORE_GOAL = 20;
     public static final int MIN_PLAYERS = 2;
     public static final int MAX_PLAYERS = 4; //one per token colour
 

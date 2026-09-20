@@ -2,6 +2,7 @@ package it.polimi.ingsw.server.model.deck;
 
 import it.polimi.ingsw.server.model.card.Card;
 import it.polimi.ingsw.util.customexceptions.EmptyDeckException;
+import java.util.List;
 
 /**
  * This abstract class represents a deck of cards that can have
@@ -11,6 +12,12 @@ import it.polimi.ingsw.util.customexceptions.EmptyDeckException;
 public abstract class DeckWithRevealedCards<T extends Card> extends Deck<T>{
     protected T leftRevealedCard;
     protected T rightRevealedCard;
+
+    protected DeckWithRevealedCards(List<T> cards) {
+        super(cards);
+        leftRevealedCard = topCardOrNull();
+        rightRevealedCard = topCardOrNull();
+    }
 
     public int getLeftRevealedCardID() {
         if (leftRevealedCard == null) { return 0;}

@@ -15,6 +15,9 @@ import java.util.Map;
  * It keeps track of the cards placed on the grid, categorized by type (plant, animal, fungi, insect), as well as resource counts associated with placed cards.
  */
 public class GameField {
+    //no legal game can spread this far from the starter card, anything beyond is a bad request
+    private static final int GRID_BOUND = 40;
+
     private record Coordinate(int x, int y) {}
 
     private final Map<Coordinate, PlaceableCard> cardsGrid;
@@ -91,7 +94,7 @@ public class GameField {
      * @return The card at (x,y) coordinates or null if it's not found.
      */
     public PlaceableCard lookAtCoordinates(int x, int y){
-        if(x<-40 || y<-40 || x>40 || y>40) return null;
+        if(x<-GRID_BOUND || y<-GRID_BOUND || x>GRID_BOUND || y>GRID_BOUND) return null;
         else return cardsGrid.get(new Coordinate(x, y));
     }
 

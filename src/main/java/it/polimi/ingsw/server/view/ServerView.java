@@ -4,6 +4,7 @@ import it.polimi.ingsw.server.ServerLog;
 import it.polimi.ingsw.network.ClientHandler;
 import it.polimi.ingsw.server.controller.GameController;
 import it.polimi.ingsw.server.lobby.Lobby;
+import it.polimi.ingsw.server.model.Player;
 import it.polimi.ingsw.util.customexceptions.CannotOpenWelcomeSocket;
 import it.polimi.ingsw.util.customexceptions.WelcomeSocketIsAlreadyOpenException;
 
@@ -12,7 +13,7 @@ import it.polimi.ingsw.util.customexceptions.WelcomeSocketIsAlreadyOpenException
  * It implements the singleton pattern.
  */
 public class ServerView {
-    private static ServerView instance;
+    private static volatile ServerView instance;
     private final ServerTerminalInputReader serverTerminalInputReader;
     private final Thread inputThread;
     private final Lobby lobby;
@@ -24,7 +25,7 @@ public class ServerView {
         this.lobby = lobby;
     }
 
-    public static ServerView getInstance(Lobby lobby) {
+    public static synchronized ServerView getInstance(Lobby lobby) {
         if(instance == null) {
             instance = new ServerView(lobby);
         }
@@ -164,7 +165,9 @@ public class ServerView {
         System.out.println(gameName + " - " + gameController.getNumberOfPlayers() + " players");
         System.out.println("Players:");
         for (ClientHandler client : gameController.getClientHandlers()) {
-            System.out.println(client.getUsername() + " has " + gameController.getCurrentPlayer(client).getScore() + " points");
+            Player player = gameController.getCurrentPlayer(client);
+            //the game thread may have dropped them between the two reads
+            if (player != null) System.out.println(client.getUsername() + " has " + player.getScore() + " points");
         }
         System.out.println("Currently it's the turn of: " + gameController.getTurnPlayerUsername());
         System.out.println();

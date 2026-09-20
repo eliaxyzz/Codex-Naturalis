@@ -12,8 +12,8 @@ import java.net.Socket;
  */
 public class ServerWelcomeSocket implements Runnable {
     private final ServerSocket serverSocket;
-    Lobby lobby;
-    boolean running;
+    private final Lobby lobby;
+    private volatile boolean running;
 
     public ServerWelcomeSocket(Lobby lobby, int port) throws CannotOpenWelcomeSocket {
         this.lobby = lobby;

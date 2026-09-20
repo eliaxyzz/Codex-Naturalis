@@ -44,7 +44,6 @@ public class StageManager {
      * @param path The path to the background image.
      * @return The ImageView containing the background image.
      */
-    @SuppressWarnings("all")
     private static ImageView loadBackground(String path) {
         Image backgroundImage = new Image(StageManager.class.getResourceAsStream(path));
         ImageView backgroundImageView = new ImageView(backgroundImage);
@@ -80,23 +79,36 @@ public class StageManager {
     }
 
     /**
-     * Loads the main title scene.
+     * Loads a scene at the fixed default window size.
+     * @param fxmlPath The path to the FXML file to be loaded.
      */
-    public static void loadTitleScreenScene() {
-        StackPane stackPane = createStackPane("TitleScreenView.fxml", false);
+    private static void loadFixedSizeScene(String fxmlPath) {
+        StackPane stackPane = createStackPane(fxmlPath, false);
         currentStage.setWidth(SCENE_WIDTH);
         currentStage.setHeight(SCENE_HEIGHT);
         showScene(new Scene(stackPane));
     }
 
     /**
+     * Loads a scene that sizes itself to its content.
+     * @param fxmlPath The path to the FXML file to be loaded.
+     */
+    private static void loadAutoSizedScene(String fxmlPath) {
+        showScene(new Scene(createStackPane(fxmlPath, false)));
+    }
+
+    /**
+     * Loads the main title scene.
+     */
+    public static void loadTitleScreenScene() {
+        loadFixedSizeScene("TitleScreenView.fxml");
+    }
+
+    /**
      * Loads the scene for connecting to the server.
      */
     public static void loadConnectToServerScene() {
-        StackPane stackPane = createStackPane("ConnectToServerView.fxml", false);
-        currentStage.setWidth(SCENE_WIDTH);
-        currentStage.setHeight(SCENE_HEIGHT);
-        showScene(new Scene(stackPane));
+        loadFixedSizeScene("ConnectToServerView.fxml");
     }
 
     /**
@@ -113,52 +125,42 @@ public class StageManager {
      * Loads the Welcome scene.
      */
     public static void loadWelcomeScene() {
-        StackPane stackPane = createStackPane("WelcomeView.fxml", false);
-        currentStage.setWidth(SCENE_WIDTH);
-        currentStage.setHeight(SCENE_HEIGHT);
-        showScene(new Scene(stackPane));
+        loadFixedSizeScene("WelcomeView.fxml");
     }
 
     /**
      * Loads the CreateGame scene.
      */
     public static void loadCreateGameScene() {
-        StackPane stackPane = createStackPane("CreateGameView.fxml", false);
-        showScene(new Scene(stackPane));
+        loadAutoSizedScene("CreateGameView.fxml");
     }
 
     /**
      * Loads the JoinGame scene.
      */
     public static void loadJoinGameScene() {
-        StackPane stackPane = createStackPane("JoinGameView.fxml", false);
-        showScene(new Scene(stackPane));
+        loadAutoSizedScene("JoinGameView.fxml");
     }
 
     /**
      * Loads the WaitForPlayers scene.
      */
     public static void loadWaitForPlayersScene() {
-        StackPane stackPane = createStackPane("WaitForPlayersView.fxml", false);
-        showScene(new Scene(stackPane));
+        loadAutoSizedScene("WaitForPlayersView.fxml");
     }
 
     /**
      * Loads the ChooseCards scene.
      */
     public static void loadChooseCardsScene() {
-        StackPane stackPane = createStackPane("ChooseCardsView.fxml", false);
-        showScene(new Scene(stackPane));
+        loadAutoSizedScene("ChooseCardsView.fxml");
     }
 
     /**
      * Loads the LostConnection scene.
      */
     public static void loadLostConnectionScene() {
-        StackPane stackPane = createStackPane("LostConnectionView.fxml", false);
-        currentStage.setWidth(SCENE_WIDTH);
-        currentStage.setHeight(SCENE_HEIGHT);
-        showScene(new Scene(stackPane));
+        loadFixedSizeScene("LostConnectionView.fxml");
     }
 
     /**
@@ -176,10 +178,7 @@ public class StageManager {
      * Loads the Leaderboard scene.
      */
     public static void loadLeaderboardScene() {
-        StackPane stackPane = createStackPane("LeaderboardView.fxml", false);
-        currentStage.setWidth(SCENE_WIDTH);
-        currentStage.setHeight(SCENE_HEIGHT);
-        showScene(new Scene(stackPane));
+        loadFixedSizeScene("LeaderboardView.fxml");
     }
 
     /**

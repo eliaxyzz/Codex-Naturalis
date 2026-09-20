@@ -12,7 +12,7 @@ import java.util.*;
  * This class is responsible for generating JSON messages that are sent to clients throughout the game.
  * These messages inform players about game state, their hand and deck information, and other relevant game events.
  */
-@SuppressWarnings("all")
+@SuppressWarnings("unchecked") //json-simple's JSONObject is a raw map
 public class ServerMessageGenerator {
 
     private final Game game;

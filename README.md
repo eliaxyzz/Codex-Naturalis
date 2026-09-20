@@ -93,4 +93,4 @@ These files can be found in deliveries.
 | Regole complete + comunicazione + CLI | 21  | |
 | Regole complete + comunicazione + GUI | 24  | |
 | Regole complete + comunicazione + GUI + 1FA| 27  | |
-| Regole complete + comunicazione + CLI + GUI + 1 FA| 30 / 30L | ✅ |# Codex Naturalis - 2024 Software Engineering Project 
+| Regole complete + comunicazione + CLI + GUI + 1 FA| 30 / 30L | ✅ |

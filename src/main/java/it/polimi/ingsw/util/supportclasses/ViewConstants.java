@@ -35,7 +35,7 @@ public final class ViewConstants {
     public static final int CLI_CORNER_HEIGHT = 2;
     public static final int CLI_CORNER_WIDTH = 5;
 
-    public static String MENU_HEADER =
+    public static final String MENU_HEADER =
             ConsoleColor.RED+"╔╦╗"+ ConsoleColor.GREEN+"╔═╗"+ ConsoleColor.PURPLE+"╔╗╔"+ConsoleColor.CYAN+"╦ ╦\n" +
                     ConsoleColor.RED+"║║║"+ ConsoleColor.GREEN+"║╣ "+ ConsoleColor.PURPLE+"║║║"+ConsoleColor.CYAN+"║ ║\n" +
                     ConsoleColor.RED+"╩ ╩"+ ConsoleColor.GREEN+"╚═╝"+ ConsoleColor.PURPLE+"╝╚╝"+ConsoleColor.CYAN+"╚═╝\n"+ConsoleColor.RESET;

@@ -1,6 +1,7 @@
 package it.polimi.ingsw.server.model.card;
 
 import it.polimi.ingsw.util.supportclasses.Resource;
+import java.util.Objects;
 
 /**
  * This class represents a Corner on the card.
@@ -10,25 +11,25 @@ public class Corner {
     protected boolean visible; //true if the corner is visible
     protected boolean attached; //true if it's connected to another corner
     protected boolean attachable; //true if corner is present on the card for connection of other cards on top of it
-    protected PlaceableCard parentCard; //card owning the corner
 
-    public Corner(Resource resource, boolean attachable, PlaceableCard card) {
+    public Corner(Resource resource, boolean attachable) {
         this.resource = resource;
         this.attachable = attachable;
-        this.parentCard = card;
         attached = false;
         visible = true;
     }
 
     @Override
-    @SuppressWarnings("all")
     public boolean equals(Object obj) {
-        if(!(obj instanceof Corner other)) {return false;}
-        else if (this.resource != other.resource) return false;
-        else if (this.attached != other.attached) return false;
-        else if (this.attachable != other.attachable) return false;
-        else if (this.visible != other.visible) return false;
-        return true;
+        if (this == obj) return true;
+        if (!(obj instanceof Corner other)) return false;
+        return resource == other.resource && attached == other.attached
+                && attachable == other.attachable && visible == other.visible;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(resource, visible, attached, attachable);
     }
 
     public Resource getResource() {
