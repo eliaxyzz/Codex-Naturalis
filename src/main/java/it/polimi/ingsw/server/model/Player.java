@@ -23,7 +23,8 @@ public class Player implements Comparable<Player> {
     private ObjectiveCard[] drawnObjectiveCards;
 
     private boolean isReady;
-    private boolean connected = true;
+    //written by the game thread, read by the lobby thread when someone asks to come back
+    private volatile boolean connected = true;
     private boolean starterCardOrientationSelected;
     private boolean alreadyPlaced;
     private int numOfCompletedObjectiveCards;

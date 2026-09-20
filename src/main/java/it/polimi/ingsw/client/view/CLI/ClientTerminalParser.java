@@ -50,6 +50,7 @@ public class ClientTerminalParser implements CommandParser {
         register(inGameOnly(Printer::printObjectives), "objectives", "obj");
         register(inGameOnly(Printer::printDeckInfo), "decks");
         register(tokens -> Printer.printGuide(), "guide");
+        register(this::reconnect, "reconnect", "rc");
     }
 
     private void register(Consumer<String[]> handler, String... names) {
@@ -124,6 +125,21 @@ public class ClientTerminalParser implements CommandParser {
             if (IN_GAME.contains(state())) action.run();
             else unexpected("you're not in a game");
         };
+    }
+
+    private void reconnect(String[] tokens) {
+        if (state() != ClientState.LOST_CONNECTION_STATE) {
+            unexpected("You're still connected");
+            return;
+        }
+        if (ClientController.getGameName() == null) {
+            Printer.printMessage("There's no game to go back to.", ConsoleColor.RED);
+            return;
+        }
+        Printer.printMessage("Trying to get back into '" + ClientController.getGameName() + "'...");
+        if (!ClientController.reconnect()) {
+            Printer.printMessage("The server is still unreachable, keeping an eye out.", ConsoleColor.RED);
+        }
     }
 
     private void updateUsername(String[] tokens) {

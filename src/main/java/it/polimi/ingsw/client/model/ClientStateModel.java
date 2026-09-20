@@ -33,6 +33,16 @@ public class ClientStateModel extends ObservableModel{
     }
 
     /**
+     * Leaves LOST_CONNECTION_STATE, which every other path treats as final. Only the
+     * reconnection flow gets to call this, once the server has taken the client back.
+     * @param clientState The state to come back into.
+     */
+    public void recoverFromLostConnection(ClientState clientState) {
+        this.clientState = clientState;
+        notifyObservers();
+    }
+
+    /**
      * Changes the client state with a reason.
      * @param clientState The new client state.
      * @param reason The reason for the change.

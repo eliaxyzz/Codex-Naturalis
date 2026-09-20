@@ -1,5 +1,6 @@
 package it.polimi.ingsw.client.view.CLI;
 
+import it.polimi.ingsw.client.controller.ClientController;
 import it.polimi.ingsw.client.model.ClientStateModel;
 import it.polimi.ingsw.client.model.PlayerModel;
 import it.polimi.ingsw.client.model.SelectableCardsModel;
@@ -142,6 +143,10 @@ public class CLIViewController extends ViewController {
             case LOST_CONNECTION_STATE -> {
                 ClientCLI.clearConsole();
                 Printer.printMessage("ERROR: Lost connection to the server.", ConsoleColor.RED);
+                if (ClientController.getGameName() != null) {
+                    Printer.printMessage("Trying to get back into '" + ClientController.getGameName()
+                            + "' - type 'reconnect' or 'rc' to try right away.");
+                }
                 Printer.printMessage("Type 'quit' or 'q' to close the game.");
             }
             case KICKED_STATE -> {

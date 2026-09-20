@@ -48,6 +48,11 @@ public class ClientMessageHandler {
         handlers.put("closingGame", message -> updateClientState(ClientState.KICKED_STATE));
         handlers.put("lastRound", this::handleLastRound);
         handlers.put("leaderBoard", this::updateLeaderboard);
+        //connection resilience
+        handlers.put("playerSuspended", message -> showError(RequestFields.getString(message, "username") + " lost connection, the game goes on without them"));
+        handlers.put("playerResumed", message -> showError(RequestFields.getString(message, "username") + " is back"));
+        handlers.put("cannotReconnect", this::cannotReconnectHandler);
+        handlers.put("gameWonByDefault", this::wonByDefaultHandler);
     }
 
     /**
@@ -154,10 +159,41 @@ public class ClientMessageHandler {
         PlayerModel.getInstance().setToken(token);
         updateDeckModelFromJSON(decksJSON);
         updateResourcesFromJSON(resourcesJSON);
-        if(PlayerModel.getInstance().getUsername().equals(firstPlayerUsername)) {
-            ClientStateModel.getInstance().setClientState(ClientState.PLACING_STATE);
+        ClientState resumedState;
+        if (!PlayerModel.getInstance().getUsername().equals(firstPlayerUsername)) {
+            resumedState = ClientState.NOT_PLAYING_STATE;
+        } else if (Boolean.parseBoolean(message.getOrDefault("alreadyPlaced", "false").toString())) {
+            //dropped between placing and drawing: come back into the drawing step, not the placing one
+            resumedState = ClientState.DRAWING_STATE;
+        } else {
+            resumedState = ClientState.PLACING_STATE;
         }
-        else ClientStateModel.getInstance().setClientState(ClientState.NOT_PLAYING_STATE);
+        if (ClientStateModel.getInstance().getClientState() == ClientState.LOST_CONNECTION_STATE) {
+            ClientController.stopRetrying();
+            ClientStateModel.getInstance().recoverFromLostConnection(resumedState);
+        } else {
+            ClientStateModel.getInstance().setClientState(resumedState);
+        }
+    }
+
+    /**
+     * The server turned the reconnection down: there's nothing to go back to.
+     * @param message The message carrying the reason.
+     */
+    private void cannotReconnectHandler(JSONObject message) {
+        ClientController.stopRetrying();
+        ClientController.setGameName(null);
+        showError(RequestFields.getString(message, "reason"));
+    }
+
+    /**
+     * Everyone else ran out of time to come back, so the last player standing takes it.
+     * @param message The message carrying the winner.
+     */
+    private void wonByDefaultHandler(JSONObject message) {
+        ClientController.stopRetrying();
+        updateClientState(ClientState.END_GAME_STATE,
+                RequestFields.getString(message, "username") + " wins: nobody else came back in time");
     }
 
     /**

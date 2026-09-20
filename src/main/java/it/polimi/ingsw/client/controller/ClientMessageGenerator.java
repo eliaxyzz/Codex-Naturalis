@@ -8,6 +8,20 @@ import java.util.Map;
  * This class is responsible for generating JSON messages that are sent to server throughout the game.
  */
 public class ClientMessageGenerator {
+
+    /**
+     * Builds the request to get back into a game after losing the connection.
+     * @param username The name to claim back.
+     * @param gameName The game to go back to.
+     * @return The message.
+     */
+    public static JSONObject generateReconnectMessage(String username, String gameName) {
+        Map<String,String> jsonMap = new HashMap<>();
+        jsonMap.put("command", "reconnect");
+        jsonMap.put("username", username);
+        jsonMap.put("gameName", gameName);
+        return new JSONObject(jsonMap);
+    }
     /**
      * Generates a JSON message object to be sent to the server for setting the player's username.
      * @param username The username to be set for the player.

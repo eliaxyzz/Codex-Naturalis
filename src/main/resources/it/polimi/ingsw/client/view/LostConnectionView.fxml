@@ -21,6 +21,16 @@
                <cursor>
                   <Cursor fx:constant="HAND" />
                </cursor></Button>
+                <Button fx:id="reconnectButton" layoutX="419.0" layoutY="343.0" mnemonicParsing="false" onAction="#reconnect" style="-fx-background-color: dbd3ad; -fx-background-radius: 10;" text="Reconnect">
+               <font>
+                  <Font name="Baskerville Old Face" size="22.0" />
+               </font>
+               <effect>
+                  <InnerShadow />
+               </effect>
+               <cursor>
+                  <Cursor fx:constant="HAND" />
+               </cursor></Button>
                 <Label fx:id="alertLabel" alignment="CENTER" layoutX="51.0" layoutY="14.0" prefHeight="79.0" prefWidth="498.0" text="Lost Connection With the Server.">
                     <font>
                         <Font name="Baskerville Old Face" size="30.0" />

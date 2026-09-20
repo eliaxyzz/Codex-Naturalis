@@ -20,7 +20,7 @@
 | Multiple games              | ✅ |
 | Persistence | ❌ |
 | Chat | ❌ |
-| Connection resilience | ❌ |
+| Connection resilience | ✅ |
 
 ### Introduction
 This project is the implementation of the board game "Codex Naturalis". It's a client-server application that manages multiple clients connected to a single server. Each game has a maximum of 4 players and a server can host multiple games.
@@ -50,10 +50,19 @@ The server is built around a few single-threaded owners that talk through queues
 - **Lobby thread** (`Lobby`): owns usernames, the connected-client list and game creation. Requests, new connections and disconnects all arrive as tasks on its queue.
 - **One thread per game** (`GameController`, run on the lobby's executor): owns its `Game`. Joins, player requests and disconnects are queued to it; nothing else writes the game's state.
 - **Two threads per connection** (`Connection`): a reader that turns lines into messages and a pinger that keeps the link alive. Either one can notice the other side is gone; only the first report counts.
+- **One scheduler for the server** (`Lobby`): fires each game's reconnection window. It never touches game state itself, it only puts a task on the owning game's queue.
 
 A client is routed to the lobby or to its game by `ClientHandler`'s `game` field (`null` means lobby). Game rules (turns, last round, setup cards, scoring) live in `Game`, `Player` and `GameField`. `GameController` only sequences them and sends the messages.
 
 On the client, `ClientController` receives messages on the network thread and updates the observable models in `client/model`. The GUI and CLI views observe those models, and the GUI moves back onto the JavaFX thread with `Platform.runLater`.
+
+### Losing and regaining a connection
+
+Dropping out of a running game suspends the player instead of ending it for everyone. Their seat, score, cards and token are held, their username stays reserved, and the turn skips them until they return. Leaving on purpose still closes the game, as before.
+
+A dropped client keeps trying to get back in on its own, and the player can also force a try with `reconnect` (`rc`) in the CLI or the button on the GUI's lost-connection screen. It reconnects by claiming its old username in its old game, and the server replies with the whole game state.
+
+If a game is down to one connected player it waits `RECONNECT_TIMEOUT` (60s) for somebody to come back, and awards the game to the player still there if nobody does. Players who never return are still scored in the final leaderboard.
 
 ### Building and testing
 

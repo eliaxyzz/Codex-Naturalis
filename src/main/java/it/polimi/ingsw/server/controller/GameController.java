@@ -154,6 +154,8 @@ public class GameController implements Runnable, ServerNetworkObserver {
         cancelLastPlayerTimeout();
         LOG.info(() -> "Player '" + username + "' rejoined the game '" + gameName + "'");
         Player player = game.getPlayer(username);
+        //they reconnected under a throwaway guest name, tell them which one they got back
+        client.send(LobbyMessageGenerator.usernameSetMessage(username));
         client.send(messageGenerator.startGameMessage(this, player));
         client.send(messageGenerator.updatedScoresMessage(this));
         if (game.getGameState() == GameState.lastRound) {
@@ -200,6 +202,8 @@ public class GameController implements Runnable, ServerNetworkObserver {
         LOG.info(() -> "Game '" + gameName + "' goes to '" + winner.getUsername() + "': nobody else came back");
         game.setGameState(GameState.endGame);
         winner.send(messageGenerator.wonByDefaultMessage(winner.getUsername()));
+        //still show them where everyone finished, absent players included
+        sendLeaderboard();
     }
 
     public String getGameName() {

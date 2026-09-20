@@ -6,6 +6,12 @@ import it.polimi.ingsw.network.ClientNetworkObserver;
 import it.polimi.ingsw.util.customexceptions.ServerUnreachableException;
 import it.polimi.ingsw.util.supportclasses.ClientState;
 import org.json.simple.JSONObject;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import static it.polimi.ingsw.util.supportclasses.Constants.RECONNECT_RETRY_ATTEMPTS;
+import static it.polimi.ingsw.util.supportclasses.Constants.RECONNECT_RETRY_INTERVAL;
 
 /**
  * This class acts as the central controller for the client-side application of the Codex game.
@@ -16,6 +22,19 @@ public class ClientController implements ClientNetworkObserver {
     private final ClientMessageHandler clientMessageHandler;
     private static volatile ClientController instance;
 
+    //what it takes to come back after a drop: where the server is, who we were and where we were
+    private static volatile String serverAddress;
+    private static volatile int serverPort;
+    private static volatile String gameName;
+    private static volatile String usernameToReclaim;
+    private static final ScheduledExecutorService RETRIES = Executors.newSingleThreadScheduledExecutor(task -> {
+        Thread thread = new Thread(task, "client-reconnect");
+        thread.setDaemon(true);
+        return thread;
+    });
+    private static ScheduledFuture<?> pendingRetry;
+    private static int retriesLeft;
+
     /**
      * Opens a connection to the server, closing the previous one if there was any.
      * @throws ServerUnreachableException If nothing answers at that address.
@@ -23,7 +42,66 @@ public class ClientController implements ClientNetworkObserver {
     public static synchronized ClientController connect(String serverAddress, int serverPort) throws ServerUnreachableException {
         if (instance != null) instance.shutdown();
         instance = new ClientController(serverAddress, serverPort);
+        ClientController.serverAddress = serverAddress;
+        ClientController.serverPort = serverPort;
         return instance;
+    }
+
+    /**
+     * Opens a fresh connection and asks to be let back into the game this client dropped out of.
+     * @return true if the server was reachable and the request went out.
+     */
+    public static synchronized boolean reconnect() {
+        if (gameName == null || usernameToReclaim == null || serverAddress == null) return false;
+        try {
+            ClientController reconnected = new ClientController(serverAddress, serverPort);
+            if (instance != null) instance.shutdown();
+            instance = reconnected;
+            reconnected.clientConnectionManager.send(ClientMessageGenerator.generateReconnectMessage(usernameToReclaim, gameName));
+            return true;
+        } catch (ServerUnreachableException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Keeps trying to get back in, until it works or the window closes. The user can also
+     * trigger a try by hand at any point.
+     */
+    private static synchronized void startRetrying() {
+        if (pendingRetry != null) return;
+        retriesLeft = RECONNECT_RETRY_ATTEMPTS;
+        pendingRetry = RETRIES.scheduleWithFixedDelay(ClientController::attemptRetry,
+                RECONNECT_RETRY_INTERVAL, RECONNECT_RETRY_INTERVAL, TimeUnit.MILLISECONDS);
+    }
+
+    private static synchronized void attemptRetry() {
+        if (ClientStateModel.getInstance().getClientState() != ClientState.LOST_CONNECTION_STATE || retriesLeft-- <= 0) {
+            stopRetrying();
+            return;
+        }
+        reconnect();
+    }
+
+    /**
+     * Stops the automatic retries. Called once we're back in, or once we've given up.
+     */
+    public static synchronized void stopRetrying() {
+        if (pendingRetry == null) return;
+        pendingRetry.cancel(false);
+        pendingRetry = null;
+    }
+
+    /**
+     * Remembers the game this client is in, so it knows where to ask to go back to.
+     * @param name The game's name, or null once the client leaves it.
+     */
+    public static void setGameName(String name) {
+        gameName = name;
+    }
+
+    public static String getGameName() {
+        return gameName;
     }
 
     /**
@@ -77,7 +155,10 @@ public class ClientController implements ClientNetworkObserver {
     @Override
     public void notifyConnectionLoss() {
         //the connection has already closed itself by the time we hear about it
+        usernameToReclaim = PlayerModel.getInstance().getUsername();
         ClientStateModel.getInstance().setClientState(ClientState.LOST_CONNECTION_STATE);
+        //only worth coming back to a game we were actually in
+        if (gameName != null) startRetrying();
     }
 
     /**
@@ -102,6 +183,7 @@ public class ClientController implements ClientNetworkObserver {
      * @param gameName The name of the game to join.
      */
     public void sendJoinGameMessage(String gameName){
+        setGameName(gameName);
         clientConnectionManager.send(ClientMessageGenerator.generateJoinGameMessage(gameName));
 
     }
@@ -110,6 +192,7 @@ public class ClientController implements ClientNetworkObserver {
      * Sends a message to the server indicating the client intends to leave the current game session.
      */
     public void sendLeaveMessage(){
+        setGameName(null);
         clientConnectionManager.send(ClientMessageGenerator.generateLeaveMessage());
     }
 
@@ -119,6 +202,7 @@ public class ClientController implements ClientNetworkObserver {
      * @param numOfPlayers The desired number of players for the game.
      */
     public void sendSetUpGameMessage(String gameName, int numOfPlayers) {
+        setGameName(gameName);
         clientConnectionManager.send(ClientMessageGenerator.generateSetUpGameMessage(gameName,numOfPlayers));
 
     }
