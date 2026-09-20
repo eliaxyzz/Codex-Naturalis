@@ -1,6 +1,7 @@
 package it.polimi.ingsw.client.view;
 
 import it.polimi.ingsw.client.view.CLI.CLIViewController;
+import it.polimi.ingsw.client.view.GUI.viewControllers.ChatViewController;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
@@ -19,6 +20,8 @@ public class StageManager {
     private static Stage currentStage;
     //set on the UI thread when a scene loads, read by the network thread to report errors
     private static volatile ViewController currentViewController;
+    //the chat lives in its own window, so it deliberately never becomes the current view controller
+    private static Stage chatStage;
 
     private StageManager() {}
 
@@ -181,6 +184,38 @@ public class StageManager {
      */
     public static void loadLeaderboardScene() {
         loadFixedSizeScene("LeaderboardView.fxml");
+    }
+
+    /**
+     * Opens the chat in its own window, or brings it forward if it's already up.
+     */
+    public static void openChatWindow() {
+        if (chatStage != null && chatStage.isShowing()) {
+            chatStage.toFront();
+            return;
+        }
+        FXMLLoader loader = new FXMLLoader(StageManager.class.getResource("ChatView.fxml"));
+        Parent root;
+        try {
+            root = loader.load();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        ChatViewController controller = loader.getController();
+        chatStage = new Stage();
+        chatStage.setTitle("Chat");
+        chatStage.setScene(new Scene(root));
+        chatStage.setOnHidden(event -> controller.detach());
+        chatStage.show();
+    }
+
+    /**
+     * Closes the chat window, if it's open.
+     */
+    public static void closeChatWindow() {
+        if (chatStage == null) return;
+        chatStage.close();
+        chatStage = null;
     }
 
     /**

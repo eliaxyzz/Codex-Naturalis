@@ -12,6 +12,10 @@ public final class Constants {
     public static final int LAST_STARTER_CARD_ID = 86;
     public static final int LAST_OBJECTIVE_CARD_ID = 102;
 
+    //in-game chat
+    public static final int CHAT_HISTORY_SIZE = 100;
+    public static final int MAX_CHAT_LENGTH = 200;
+
     //how long a game waits with a single player left before awarding it to them
     public static final int RECONNECT_TIMEOUT = 60000;
     //how the client retries after a mid-game drop

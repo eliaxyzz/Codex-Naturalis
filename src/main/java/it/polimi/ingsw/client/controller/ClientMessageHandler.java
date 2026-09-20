@@ -4,6 +4,7 @@ import it.polimi.ingsw.client.model.*;
 import it.polimi.ingsw.client.view.StageManager;
 import it.polimi.ingsw.client.view.utility.CardRepresentation;
 import it.polimi.ingsw.util.customexceptions.InvalidMessageException;
+import it.polimi.ingsw.util.supportclasses.ChatLine;
 import it.polimi.ingsw.util.supportclasses.ClientState;
 import it.polimi.ingsw.util.supportclasses.RequestFields;
 import it.polimi.ingsw.util.supportclasses.Token;
@@ -52,6 +53,9 @@ public class ClientMessageHandler {
         handlers.put("playerSuspended", message -> showError(RequestFields.getString(message, "username") + " lost connection, the game goes on without them"));
         handlers.put("playerResumed", message -> showError(RequestFields.getString(message, "username") + " is back"));
         handlers.put("cannotReconnect", this::cannotReconnectHandler);
+        //chat
+        handlers.put("chatMessage", this::chatMessageHandler);
+        handlers.put("cannotChat", message -> showError(RequestFields.getString(message, "reason")));
         handlers.put("gameWonByDefault", this::wonByDefaultHandler);
     }
 
@@ -174,6 +178,17 @@ public class ClientMessageHandler {
         } else {
             ClientStateModel.getInstance().setClientState(resumedState);
         }
+    }
+
+    /**
+     * Files one line of chat into the model, which the views are watching.
+     * @param message The message carrying the line.
+     */
+    private void chatMessageHandler(JSONObject message) {
+        ChatModel.getInstance().addLine(new ChatLine(
+                RequestFields.getString(message, "sender"),
+                RequestFields.getStringOrNull(message, "recipient"),
+                RequestFields.getString(message, "text")));
     }
 
     /**

@@ -151,7 +151,14 @@
                <effect>
                   <InnerShadow />
                </effect></Button>
-            <Button fx:id="leaveGameButton" layoutX="17.0" layoutY="720.0" mnemonicParsing="false" onAction="#leaveGame" prefHeight="40.0" prefWidth="60.0" style="-fx-background-color: a40f0f;" text="🏃🚪" textFill="WHITE">
+            <Button fx:id="chatButton" layoutX="17.0" layoutY="664.0" mnemonicParsing="false" onAction="#openChat" prefHeight="40.0" prefWidth="60.0" style="-fx-background-color: dbd3ad; -fx-background-radius: 10;" text="Chat">
+               <font>
+                  <Font name="Baskerville Old Face" size="15.0" />
+               </font>
+               <cursor>
+                  <Cursor fx:constant="HAND" />
+               </cursor></Button>
+                <Button fx:id="leaveGameButton" layoutX="17.0" layoutY="720.0" mnemonicParsing="false" onAction="#leaveGame" prefHeight="40.0" prefWidth="60.0" style="-fx-background-color: a40f0f;" text="🏃🚪" textFill="WHITE">
                <font>
                   <Font size="19.0" />
                </font>

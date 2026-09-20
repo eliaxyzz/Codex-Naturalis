@@ -22,6 +22,14 @@ public final class RequestFields {
         return value.toString();
     }
 
+    /**
+     * @return The field's value, or null if the message doesn't carry it.
+     */
+    public static String getStringOrNull(JSONObject message, String key) {
+        Object value = message.get(key);
+        return value == null ? null : value.toString();
+    }
+
     public static int getInt(JSONObject message, String key) {
         String value = getString(message, key);
         try {

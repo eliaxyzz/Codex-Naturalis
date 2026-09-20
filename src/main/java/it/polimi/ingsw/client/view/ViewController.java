@@ -59,6 +59,11 @@ public abstract class ViewController {
     public void updateObjectives(){}
 
     /**
+     * Shows the chat in the UI.
+     */
+    public void updateChat(){}
+
+    /**
      * Updates the scene status in the UI accordingly to the current ClientStateModel.
      */
     public void updateSceneStatus(){}

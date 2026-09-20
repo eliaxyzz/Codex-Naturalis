@@ -5,6 +5,7 @@ import it.polimi.ingsw.client.model.*;
 import it.polimi.ingsw.client.view.StageManager;
 import it.polimi.ingsw.client.view.ViewController;
 import it.polimi.ingsw.client.view.utility.*;
+import it.polimi.ingsw.util.supportclasses.ChatLine;
 import it.polimi.ingsw.util.supportclasses.ClientState;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -48,6 +49,8 @@ public class GameFieldViewController extends ViewController {
     private Button flipButton;
     @FXML
     private Button leaveGameButton;
+    @FXML
+    private Button chatButton;
     @FXML
     private Pane scoreTrackPane;
     @FXML
@@ -140,6 +143,7 @@ public class GameFieldViewController extends ViewController {
      */
     @FXML
     private void leaveGame(){
+        StageManager.closeChatWindow();
         ClientController.getInstance().sendLeaveMessage();
         ClientStateModel.getInstance().setClientState(ClientState.LOBBY_STATE);
         ClientController.getInstance().resetModels();
@@ -221,6 +225,24 @@ public class GameFieldViewController extends ViewController {
     @Override
     public void showMessage(String message){
         Platform.runLater(()-> alertLabel.setText(message));
+    }
+
+    /**
+     * Opens the chat in its own window.
+     */
+    @FXML
+    private void openChat(){
+        StageManager.openChatWindow();
+    }
+
+    /**
+     * The chat window shows the conversation itself; on the board just flag that something
+     * was said, so a player with the window closed still notices.
+     */
+    @Override
+    public void updateChat(){
+        ChatLine line = ChatModel.getInstance().getLastLine();
+        if (line != null) showSpecialMessage(line.format(PlayerModel.getInstance().getUsername()));
     }
 
     /**

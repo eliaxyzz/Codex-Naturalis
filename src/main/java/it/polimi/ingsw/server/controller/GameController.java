@@ -3,6 +3,8 @@ package it.polimi.ingsw.server.controller;
 import it.polimi.ingsw.network.ClientHandler;
 import it.polimi.ingsw.network.ServerNetworkObserver;
 import it.polimi.ingsw.server.ServerLog;
+import it.polimi.ingsw.server.chat.ChatEntry;
+import it.polimi.ingsw.server.chat.ChatLog;
 import it.polimi.ingsw.server.lobby.Lobby;
 import it.polimi.ingsw.server.lobby.LobbyMessageGenerator;
 import it.polimi.ingsw.server.model.DrawSource;
@@ -22,6 +24,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import static it.polimi.ingsw.util.supportclasses.Constants.MAX_CHAT_LENGTH;
 
 /**
  * Runs one game: connects the players' connections to the Game model and tells everyone what happened.
@@ -39,6 +42,7 @@ public class GameController implements Runnable, ServerNetworkObserver {
     private final Lobby lobby;
     private final Game game;
     private final BlockingQueue<Runnable> tasks = new LinkedBlockingQueue<>();
+    private final ChatLog chatLog = new ChatLog();
     private final GameRequestHandler gameRequestHandler;
     private final ServerMessageGenerator messageGenerator;
     private volatile boolean running = true;
@@ -161,6 +165,7 @@ public class GameController implements Runnable, ServerNetworkObserver {
         if (game.getGameState() == GameState.lastRound) {
             client.send(messageGenerator.lastRoundMessage("the game was already at its last round"));
         }
+        replayChat(client, username);
         broadcast(messageGenerator.playerResumedMessage(username));
     }
 
@@ -252,6 +257,54 @@ public class GameController implements Runnable, ServerNetworkObserver {
         game.addPlayer(client.getUsername());
         client.send(confirmation);
         LOG.info(() -> "Player '" + client.getUsername() + "' joined the game '" + gameName + "'");
+    }
+
+    /**
+     * Sends one line of chat, to the whole table or to a single player.
+     * @param client Who is writing.
+     * @param rawText What they wrote.
+     * @param recipient Who it's for, or null for everyone.
+     */
+    public void sendChat(ClientHandler client, String rawText, String recipient) {
+        String text = rawText == null ? "" : rawText.trim();
+        if (text.isEmpty()) {
+            client.send(messageGenerator.cannotChatMessage("You can't send an empty message"));
+            return;
+        }
+        if (text.length() > MAX_CHAT_LENGTH) {
+            client.send(messageGenerator.cannotChatMessage("Keep it under " + MAX_CHAT_LENGTH + " characters"));
+            return;
+        }
+        String sender = client.getUsername();
+        if (recipient == null) {
+            chatLog.add(new ChatEntry(sender, null, text));
+            broadcast(messageGenerator.chatMessage(sender, null, text));
+            return;
+        }
+        if (recipient.equals(sender)) {
+            client.send(messageGenerator.cannotChatMessage("You can't whisper to yourself"));
+            return;
+        }
+        if (game.getPlayer(recipient) == null) {
+            client.send(messageGenerator.cannotChatMessage("There's no '" + recipient + "' in this game"));
+            return;
+        }
+        //logged either way, so a player who is away still reads it when they come back
+        chatLog.add(new ChatEntry(sender, recipient, text));
+        JSONObject message = messageGenerator.chatMessage(sender, recipient, text);
+        client.send(message);
+        for (ClientHandler other : clientHandlers) {
+            if (recipient.equals(other.getUsername())) other.send(message);
+        }
+    }
+
+    /**
+     * Catches a returning player up on what was said, leaving out whispers that were never theirs.
+     */
+    private void replayChat(ClientHandler client, String username) {
+        for (ChatEntry entry : chatLog.visibleTo(username)) {
+            client.send(messageGenerator.chatMessage(entry.sender(), entry.recipient(), entry.text()));
+        }
     }
 
     /**

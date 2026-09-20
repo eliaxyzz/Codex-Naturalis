@@ -19,7 +19,7 @@
 | Server CLI                  | ✅ |
 | Multiple games              | ✅ |
 | Persistence | ❌ |
-| Chat | ❌ |
+| Chat | ✅ |
 | Connection resilience | ✅ |
 
 ### Introduction
@@ -55,6 +55,12 @@ The server is built around a few single-threaded owners that talk through queues
 A client is routed to the lobby or to its game by `ClientHandler`'s `game` field (`null` means lobby). Game rules (turns, last round, setup cards, scoring) live in `Game`, `Player` and `GameField`. `GameController` only sequences them and sends the messages.
 
 On the client, `ClientController` receives messages on the network thread and updates the observable models in `client/model`. The GUI and CLI views observe those models, and the GUI moves back onto the JavaFX thread with `Platform.runLater`.
+
+### Chat
+
+Players in a game can talk to the whole table or whisper to one player. The server keeps the last 100 lines of each game, and replays them to a player who reconnects - leaving out the whispers that were never theirs to read.
+
+In the CLI: `chat <message>` (`ch`), `whisper <player> <message>` (`w`) and `messages` (`msg`) to reread the conversation. In the GUI the **Chat** button on the game board opens the chat in its own window, with a picker for who the message goes to.
 
 ### Losing and regaining a connection
 

@@ -42,6 +42,7 @@ public class GameRequestHandler {
         DRAW_COMMANDS.forEach((command, source) -> commands.put(command, (client, message) -> draw(client, source)));
         commands.put("place", this::place);
         commands.put("leave", (client, message) -> leave(client));
+        commands.put("chat", this::chat);
     }
 
     /**
@@ -146,6 +147,16 @@ public class GameRequestHandler {
         catch (CannotPlaceCardException e) {
             client.send(messageGenerator.cannotPlaceMessage(e.getMessage()));
         }
+    }
+
+    /**
+     * processes a chat line from a client
+     * @param client client handler representing the player who sent the request
+     * @param message JSON message carrying the text and, for a whisper, the recipient
+     */
+    private void chat(ClientHandler client, JSONObject message) {
+        gameController.sendChat(client, RequestFields.getString(message, "text"),
+                RequestFields.getStringOrNull(message, "recipient"));
     }
 
     /**

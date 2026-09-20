@@ -10,6 +10,20 @@ import java.util.Map;
 public class ClientMessageGenerator {
 
     /**
+     * Builds a chat line to send.
+     * @param text What to say.
+     * @param recipient Who to whisper it to, or null to tell the whole table.
+     * @return The message.
+     */
+    public static JSONObject generateChatMessage(String text, String recipient) {
+        Map<String,String> jsonMap = new HashMap<>();
+        jsonMap.put("command", "chat");
+        jsonMap.put("text", text);
+        if (recipient != null) jsonMap.put("recipient", recipient);
+        return new JSONObject(jsonMap);
+    }
+
+    /**
      * Builds the request to get back into a game after losing the connection.
      * @param username The name to claim back.
      * @param gameName The game to go back to.

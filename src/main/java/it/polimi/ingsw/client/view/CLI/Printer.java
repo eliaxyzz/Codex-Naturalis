@@ -5,6 +5,7 @@ import it.polimi.ingsw.client.view.utility.CardRepresentation;
 import it.polimi.ingsw.server.model.json.JsonCardsReader;
 import it.polimi.ingsw.util.customexceptions.CannotOpenJSONException;
 import it.polimi.ingsw.util.customexceptions.InvalidIdException;
+import it.polimi.ingsw.util.supportclasses.ChatLine;
 import it.polimi.ingsw.util.supportclasses.ClientState;
 import it.polimi.ingsw.util.supportclasses.ConsoleColor;
 import it.polimi.ingsw.util.supportclasses.Resource;
@@ -79,23 +80,27 @@ public class Printer {
                 System.out.println("startercard | sc <front/back>        Choose the starter card side");
                 System.out.println("secretobjective | so <cardId>        Choose your secret objective");
                 System.out.println("leave | l                            Leave the game, brings you back to the lobby");
+                printChatCommands();
             }
             case ClientState.DRAWING_STATE -> {
                 System.out.println("info | i <cardId>                    View information of a card");
                 System.out.println("draw | d <1-6>                       Draw a card using the index");
                 System.out.println("objectives | obj                     Shows your current active objectives");
                 System.out.println("leave | l                            Leave the game, brings you back to the lobby");
+                printChatCommands();
             }
             case ClientState.PLACING_STATE -> {
                 System.out.println("info | i <cardId>                    View information of a card");
                 System.out.println("place | p <cardId> <front/back> <targetId> <position> Place a card in a specific position on the game field. The position argument can be 'topleft'/'tl' or 'topright'/'tr' or 'bottomleft'/'bl' or 'bottomright'/'br'");
                 System.out.println("objectives | obj                     Shows your current active objectives");
                 System.out.println("leave | l                            Leave the game, brings you back to the lobby");
+                printChatCommands();
             }
             case ClientState.NOT_PLAYING_STATE -> {
                 System.out.println("info | i <cardId>                    View information of a card");
                 System.out.println("objectives | obj                     Shows your current active objectives");
                 System.out.println("leave | l                            Leave the game, brings you back to the lobby");
+                printChatCommands();
             }
             case ClientState.END_GAME_STATE -> System.out.println("leave | l                            Leave the game, brings you back to the lobby");
             default -> {
@@ -108,6 +113,15 @@ public class Printer {
         }
         System.out.println("quit | q                             Exit from Codex");
         System.out.println("------------------------------------------------------------------------------------");
+    }
+
+    /**
+     * The chat commands, which are the same wherever you are at a table.
+     */
+    private static void printChatCommands() {
+        System.out.println("chat | ch <message>                  Say something to the whole table");
+        System.out.println("whisper | w <player> <message>       Say something to one player only");
+        System.out.println("messages | msg                       Show the chat so far");
     }
 
     /**
@@ -247,6 +261,34 @@ public class Printer {
         }
 
         printMatrix(gameField);
+    }
+
+    /**
+     * Prints the whole chat so far.
+     */
+    public static void printChat() {
+        List<ChatLine> lines = ChatModel.getInstance().getLines();
+        printMessage("Chat", ConsoleColor.CYAN);
+        if (lines.isEmpty()) {
+            System.out.println("Nothing has been said yet.");
+        } else {
+            String me = PlayerModel.getInstance().getUsername();
+            for (ChatLine line : lines) {
+                System.out.println(line.format(me));
+            }
+        }
+        System.out.println();
+    }
+
+    /**
+     * Prints the line that just came in, so it shows up as it is said.
+     */
+    public static void printLatestChatLine() {
+        ChatLine line = ChatModel.getInstance().getLastLine();
+        if (line == null) return;
+        String me = PlayerModel.getInstance().getUsername();
+        System.out.println((line.isPrivate() ? ConsoleColor.PURPLE : ConsoleColor.CYAN)
+                + line.format(me) + ConsoleColor.RESET);
     }
 
     /**

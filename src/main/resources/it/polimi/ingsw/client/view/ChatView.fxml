@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.*?>
+
+<VBox prefHeight="420.0" prefWidth="460.0" spacing="8.0" style="-fx-background-color: dbd3bc;" xmlns="http://javafx.com/javafx/17.0.2-ea" xmlns:fx="http://javafx.com/fxml/1" fx:controller="it.polimi.ingsw.client.view.GUI.viewControllers.ChatViewController">
+    <padding>
+        <Insets bottom="12.0" left="12.0" right="12.0" top="12.0" />
+    </padding>
+    <children>
+        <Label text="Chat">
+            <font>
+                <Font name="Baskerville Old Face" size="24.0" />
+            </font>
+        </Label>
+        <TextArea fx:id="chatArea" editable="false" wrapText="true" VBox.vgrow="ALWAYS" />
+        <Label fx:id="errorLabel" textFill="#a40f0f" />
+        <HBox spacing="8.0">
+            <children>
+                <ComboBox fx:id="recipientBox" prefWidth="130.0" />
+                <TextField fx:id="messageField" promptText="Say something..." onAction="#send" HBox.hgrow="ALWAYS" />
+                <Button fx:id="sendButton" defaultButton="true" mnemonicParsing="false" onAction="#send" style="-fx-background-color: dbd3ad; -fx-background-radius: 10;" text="Send" />
+            </children>
+        </HBox>
+    </children>
+</VBox>

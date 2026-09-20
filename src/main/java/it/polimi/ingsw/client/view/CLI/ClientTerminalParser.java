@@ -11,6 +11,7 @@ import it.polimi.ingsw.util.supportclasses.ClientState;
 import it.polimi.ingsw.util.supportclasses.ConsoleColor;
 import static it.polimi.ingsw.util.supportclasses.Constants.MAX_PLAYERS;
 import static it.polimi.ingsw.util.supportclasses.Constants.MIN_PLAYERS;
+import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
@@ -51,6 +52,9 @@ public class ClientTerminalParser implements CommandParser {
         register(inGameOnly(Printer::printDeckInfo), "decks");
         register(tokens -> Printer.printGuide(), "guide");
         register(this::reconnect, "reconnect", "rc");
+        register(this::chat, "chat", "ch");
+        register(this::whisper, "whisper", "w");
+        register(inGameOnly(Printer::printChat), "messages", "msg");
     }
 
     private void register(Consumer<String[]> handler, String... names) {
@@ -125,6 +129,46 @@ public class ClientTerminalParser implements CommandParser {
             if (IN_GAME.contains(state())) action.run();
             else unexpected("you're not in a game");
         };
+    }
+
+    /**
+     * chat &lt;message&gt;
+     */
+    private void chat(String[] tokens) {
+        if (!requireInAGame()) return;
+        if (tokens.length < 2) {
+            parseError("nothing to say");
+            return;
+        }
+        ClientController.getInstance().sendChatMessage(joinFrom(tokens, 1), null);
+    }
+
+    /**
+     * whisper &lt;player&gt; &lt;message&gt;
+     */
+    private void whisper(String[] tokens) {
+        if (!requireInAGame()) return;
+        if (tokens.length < 3) {
+            parseError("whisper needs a player and a message");
+            return;
+        }
+        ClientController.getInstance().sendChatMessage(joinFrom(tokens, 2), tokens[1]);
+    }
+
+    /**
+     * Puts the message back together: the parser split it on spaces to get the command.
+     */
+    private String joinFrom(String[] tokens, int firstWord) {
+        return String.join(" ", Arrays.copyOfRange(tokens, firstWord, tokens.length));
+    }
+
+    /**
+     * Chat is a table thing: it needs a table.
+     */
+    private boolean requireInAGame() {
+        if (IN_GAME.contains(state()) || state() == ClientState.GAME_SETUP_STATE) return true;
+        unexpected("You're not in a game");
+        return false;
     }
 
     private void reconnect(String[] tokens) {

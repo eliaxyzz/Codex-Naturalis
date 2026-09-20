@@ -27,6 +27,7 @@ public class ClientGUI extends Application {
         new DeckObserver();
         new GameFieldObserver();
         new HandObserver();
+        new ChatObserver();
         new ObjectivesObserver();
         new PlayerObserver();
         new ScoreBoardObserver();

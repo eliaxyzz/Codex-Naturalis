@@ -146,6 +146,7 @@ public class ClientController implements ClientNetworkObserver {
         PlayerModel.getInstance().clear();
         ScoreBoardModel.getInstance().clear();
         SelectableCardsModel.getInstance().clear();
+        ChatModel.getInstance().clear();
     }
 
 
@@ -282,6 +283,15 @@ public class ClientController implements ClientNetworkObserver {
      */
     public void sendDrawRightGoldCardMessage() {
         clientConnectionManager.send(ClientMessageGenerator.generateDrawRightGoldCardMessage());
+    }
+
+    /**
+     * Sends a chat line to the other players.
+     * @param text What to say.
+     * @param recipient Who to whisper it to, or null to tell the whole table.
+     */
+    public void sendChatMessage(String text, String recipient) {
+        clientConnectionManager.send(ClientMessageGenerator.generateChatMessage(text, recipient));
     }
 
     /**

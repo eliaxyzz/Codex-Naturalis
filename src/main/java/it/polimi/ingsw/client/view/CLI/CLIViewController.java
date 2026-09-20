@@ -19,6 +19,7 @@ public class CLIViewController extends ViewController {
     public CLIViewController() {
         //initializing observers
         new AvailableGamesObserver();
+        new ChatObserver();
         new ClientStateObserver();
         new DeckObserver();
         new GameFieldObserver();
@@ -36,6 +37,14 @@ public class CLIViewController extends ViewController {
     @Override
     public void showMessage(String message) {
         Printer.printMessage(message);
+    }
+
+    /**
+     * Prints the line that just arrived.
+     */
+    @Override
+    public void updateChat() {
+        Printer.printLatestChatLine();
     }
 
     /**

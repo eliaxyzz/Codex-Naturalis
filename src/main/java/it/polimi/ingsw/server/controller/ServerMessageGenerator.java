@@ -62,6 +62,34 @@ public class ServerMessageGenerator {
     }
 
     /**
+     * Carries one line of chat to a client.
+     * @param sender Who wrote it.
+     * @param recipient Who it was addressed to, or null if it went to the whole table.
+     * @param text What they wrote.
+     * @return The message.
+     */
+    public JSONObject chatMessage(String sender, String recipient, String text) {
+        JSONObject message = new JSONObject();
+        message.put("message", "chatMessage");
+        message.put("sender", sender);
+        message.put("text", text);
+        if (recipient != null) message.put("recipient", recipient);
+        return message;
+    }
+
+    /**
+     * Tells a client their message didn't go anywhere.
+     * @param reason Why it was refused.
+     * @return The message.
+     */
+    public JSONObject cannotChatMessage(String reason) {
+        Map<String,String> jsonMap = new HashMap<>();
+        jsonMap.put("message", "cannotChat");
+        jsonMap.put("reason", reason);
+        return new JSONObject(jsonMap);
+    }
+
+    /**
      * Tells everyone that a player lost their connection and the game is going on without them.
      * @param username The player that went away.
      * @return The message.
