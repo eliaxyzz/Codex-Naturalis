@@ -47,4 +47,10 @@ class ClientTerminalParserTest {
         parser.parse("fly");
         assertTrue(output.toString().contains("Unknown command"));
     }
+
+    @Test
+    void theShortInfoAliasTheHelpAdvertisesWorks() {
+        parser.parse("i");
+        assertFalse(output.toString().contains("Unknown command"));
+    }
 }

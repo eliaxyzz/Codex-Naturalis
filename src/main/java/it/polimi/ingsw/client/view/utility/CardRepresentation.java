@@ -4,19 +4,25 @@ import javafx.scene.image.Image;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.ImagePattern;
 import javafx.scene.shape.Rectangle;
+import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 import static it.polimi.ingsw.util.supportclasses.ViewConstants.*;
 
 /**
  * This class manages the visual representation of a card.
  */
 public class CardRepresentation {
+    private static final double CORNER_ARC = 10;
+    private static final double BORDER_WIDTH = 2;
+
+    //card art never changes, and the board reloaded every PNG on each repaint
+    private static final Map<String, Image> TEXTURES = new ConcurrentHashMap<>();
+
     private final String frontCardTexturePath;
     private final String backCardTexturePath;
     private final int id;
     private boolean facingUp;
-    private Rectangle cardFront;
-    private Rectangle cardBack;
 
     //only used in placementHistory array to memorize coordinates
     private int x;
@@ -63,9 +69,7 @@ public class CardRepresentation {
      * @return the Rectangle representing the card.
      */
     public Rectangle getCard() {
-        loadCardRectangle();
-        if (facingUp) return cardFront;
-        else return cardBack;
+        return buildCard(CARD_WIDTH, CARD_HEIGHT);
     }
 
     /**
@@ -74,36 +78,25 @@ public class CardRepresentation {
      * @return the Rectangle representing the card.
      */
     public Rectangle getCard(double size){
-        loadCardRectangle();
-        if (facingUp) {
-            cardFront.setWidth(size*CARD_WIDTH);
-            cardFront.setHeight(size*CARD_HEIGHT);
-            return cardFront;
-        }
-        else{
-            cardBack.setWidth(size*CARD_WIDTH);
-            cardBack.setHeight(size*CARD_HEIGHT);
-            return cardBack;
-        }
+        return buildCard(size * CARD_WIDTH, size * CARD_HEIGHT);
     }
 
-    private void loadCardRectangle() {
-        Image frontTextureImage = new Image(Objects.requireNonNull(getClass().getResourceAsStream(frontCardTexturePath)));
-        Image backTextureImage = new Image(Objects.requireNonNull(getClass().getResourceAsStream(backCardTexturePath)));
+    /**
+     * Each call returns a new Rectangle: callers place several of them independently.
+     */
+    private Rectangle buildCard(double width, double height) {
+        Rectangle card = new Rectangle(width, height);
+        card.setArcWidth(CORNER_ARC);
+        card.setArcHeight(CORNER_ARC);
+        card.setStroke(Color.BLACK);
+        card.setStrokeWidth(BORDER_WIDTH);
+        card.setFill(new ImagePattern(texture(facingUp ? frontCardTexturePath : backCardTexturePath)));
+        return card;
+    }
 
-        cardFront = new Rectangle(CARD_WIDTH, CARD_HEIGHT);
-        cardFront.setArcWidth(10);
-        cardFront.setArcHeight(10);
-        cardFront.setStroke(Color.BLACK);
-        cardFront.setStrokeWidth(2);
-        cardFront.setFill(new ImagePattern(frontTextureImage));
-
-        cardBack = new Rectangle(CARD_WIDTH, CARD_HEIGHT);
-        cardBack.setArcWidth(10);
-        cardBack.setArcHeight(10);
-        cardBack.setStroke(Color.BLACK);
-        cardBack.setStrokeWidth(2);
-        cardBack.setFill(new ImagePattern(backTextureImage));
+    private static Image texture(String path) {
+        return TEXTURES.computeIfAbsent(path,
+                p -> new Image(Objects.requireNonNull(CardRepresentation.class.getResourceAsStream(p))));
     }
 
     public int getId() {

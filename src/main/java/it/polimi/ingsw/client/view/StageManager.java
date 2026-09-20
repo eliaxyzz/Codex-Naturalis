@@ -20,6 +20,8 @@ public class StageManager {
     //set on the UI thread when a scene loads, read by the network thread to report errors
     private static volatile ViewController currentViewController;
 
+    private StageManager() {}
+
     public static void setCurrentStage(Stage currentStage) {
         StageManager.currentStage = currentStage;
     }

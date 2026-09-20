@@ -37,7 +37,7 @@ public class ClientTerminalParser implements CommandParser {
         register(tokens -> ClientCLI.getInstance().shutdown(), "quit", "q");
         register(this::createGame, "create", "c");
         register(this::getAvailableGames, "availablegames", "ag");
-        register(this::getInfo, "info");
+        register(this::getInfo, "info", "i");
         register(this::joinGame, "join", "j");
         register(this::setReady, "ready", "r");
         register(this::selectStarterCardOrientation, "startercard", "sc");

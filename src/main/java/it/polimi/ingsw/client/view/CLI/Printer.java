@@ -17,6 +17,8 @@ import static it.polimi.ingsw.util.supportclasses.ViewConstants.*;
  */
 public class Printer {
 
+    private Printer() {}
+
     /**
      * Prints a message to the console with a border.
      * @param message The message to print.
@@ -44,8 +46,8 @@ public class Printer {
     public static void printCodexLogo() {
         ClassLoader classloader = Thread.currentThread().getContextClassLoader();
         InputStream is = classloader.getResourceAsStream("Codex_logo.txt");
-        if (is != null) {
-            Scanner sc = new Scanner(is);
+        if (is == null) return;
+        try (Scanner sc = new Scanner(is)) {
             ClientCLI.clearConsole();
             while (sc.hasNextLine()) {
                 System.out.println(ConsoleColor.GREEN + sc.nextLine() + ConsoleColor.RESET);

@@ -13,7 +13,7 @@ import it.polimi.ingsw.util.supportclasses.ConsoleColor;
  */
 public class CLIViewController extends ViewController {
 
-    private static ClientState previousState = null;
+    private ClientState previousState = null;
 
     public CLIViewController() {
         //initializing observers
